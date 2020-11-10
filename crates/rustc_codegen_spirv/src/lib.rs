@@ -153,10 +153,10 @@ fn is_blocklisted_fn(symbol_name: &str) -> bool {
 
 fn target_options() -> Target {
     Target {
+        arch: "spirv".to_string(),
+        data_layout: "e-m:e-p:32:32:32-i64:64-n8:16:32:64".to_string(),
         llvm_target: "no-llvm".to_string(),
         pointer_width: 32,
-        data_layout: "e-m:e-p:32:32:32-i64:64-n8:16:32:64".to_string(),
-        arch: "spirv".to_string(),
         options: TargetOptions {
             allows_weak_linkage: false,
             crt_static_allows_dylibs: true,
@@ -165,10 +165,10 @@ fn target_options() -> Target {
             dynamic_linking: true,
             emit_debug_gdb_scripts: false,
             linker_flavor: LinkerFlavor::Ld,
-            panic_strategy: PanicStrategy::Abort,
-            target_os: "unknown".to_string(),
             // TODO: Investigate if main_needs_argc_argv is useful (for building exes)
             main_needs_argc_argv: false,
+            panic_strategy: PanicStrategy::Abort,
+            target_os: "unknown".to_string(),
             ..Default::default()
         },
     }
