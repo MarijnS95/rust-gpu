@@ -1,14 +1,11 @@
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     window::Window,
 };
-
-static RELOAD: AtomicBool = AtomicBool::new(false);
 
 fn create_pipeline(
     device: &wgpu::Device,
@@ -79,11 +76,10 @@ async fn run(event_loop: EventLoop<()>, window: Window, swapchain_format: wgpu::
         .await
         .expect("Failed to create device");
 
-    let mut file_watcher: RecommendedWatcher = Watcher::new_immediate(|res| match res {
-        Ok(_event) => {
-            RELOAD.store(true, Ordering::SeqCst);
-        }
-        Err(e) => println!("watch error: {:?}", e),
+    let (tx, rx) = std::sync::mpsc::channel();
+
+    let mut file_watcher: RecommendedWatcher = Watcher::new_immediate(move |x| {
+        tx.send(x /* .unwrap() */).unwrap()
     })
     .expect("Failed setting up file watcher");
 
@@ -155,9 +151,7 @@ async fn run(event_loop: EventLoop<()>, window: Window, swapchain_format: wgpu::
                 ..
             } => *control_flow = ControlFlow::Exit,
             _ => {
-                if RELOAD.load(Ordering::SeqCst) {
-                    RELOAD.store(false, Ordering::SeqCst);
-
+                if let Ok(_changed_file) = rx.try_recv() {
                     let start_time = Instant::now();
                     let spirv_bytes =
                         std::fs::read(&shader_path).expect("Failed reading shader file");
