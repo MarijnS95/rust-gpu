@@ -197,7 +197,7 @@ impl SpirvBuilder {
         let output = rustc::cargo()
             .args(&args)
             .stderr(Stdio::inherit())
-            .current_dir(&repo_dir.join("crates").join(CRATE_NAME))
+            .current_dir(&dbg!(repo_dir.join("crates").join(CRATE_NAME)))
             .output()?;
 
         let backend = repo_dir
