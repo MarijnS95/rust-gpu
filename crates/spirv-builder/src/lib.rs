@@ -194,11 +194,18 @@ impl SpirvBuilder {
             args.push("--release".into());
         }
 
-        let output = rustc::cargo()
-            .args(&args)
-            .stderr(Stdio::inherit())
-            .current_dir(&dbg!(repo_dir.join("crates").join(CRATE_NAME)))
-            .output()?;
+        let mut output = rustc::cargo();
+        output.args(&args);
+        output.stderr(Stdio::inherit());
+        output.current_dir(&dbg!(repo_dir.join("crates").join(CRATE_NAME)));
+
+        let p = repo_dir.join("crates").join(CRATE_NAME);
+
+        println!("{:?} {:?}", p.to_str(), &p);
+
+        dbg!(&output);
+
+        let output = output.output()?;
 
         let backend = repo_dir
             .join("target")

@@ -116,6 +116,7 @@ async fn run(
         let _ = (&instance, &adapter, &module, &pipeline_layout);
 
         *control_flow = ControlFlow::Wait;
+        println!("{}", &event);
         match event {
             Event::MainEventsCleared => {
                 window.request_redraw();
