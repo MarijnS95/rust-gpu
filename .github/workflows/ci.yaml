@@ -60,8 +60,8 @@ jobs:
       - name: cargo fetch
         run: cargo fetch --target ${{ matrix.target }}
       - name: Run tests
-        shell: bash
-        run: .github/workflows/test.sh ${{ runner.os }}
+        shell: powershell
+        run: bash .github/workflows/test.sh ${{ runner.os }}
 
       - name: Install cargo-apk
         run: cargo install cargo-apk
