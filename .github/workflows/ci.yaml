@@ -1,7 +1,7 @@
 on:
   push:
-    branches:
-      - main
+    # branches:
+    #   - main
   pull_request:
 
 name: Continuous integration
@@ -12,12 +12,12 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
+          # - os: ubuntu-latest
+          #   target: x86_64-unknown-linux-gnu
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-          - os: macOS-latest
-            target: x86_64-apple-darwin
+          # - os: macOS-latest
+          #   target: x86_64-apple-darwin
     runs-on: ${{ matrix.os }}
     env:
       spirv_tools_version: "20200928"
@@ -88,34 +88,34 @@ jobs:
           rustup target add aarch64-linux-android
           cargo apk build --manifest-path examples/runners/wgpu/Cargo.toml --features use-installed-tools --no-default-features
 
-  lint:
-    name: Lint
-    runs-on: ubuntu-latest
-    steps:
-      # Note that we are explicitly NOT checking out submodules, to validate
-      # that we haven't accidentally enabled spirv-tools native compilation
-      # and regressed CI times
-      - uses: actions/checkout@v2
-        with:
-          submodules: "false"
-      - name: Install native dependencies
-        run: sudo apt install libwayland-cursor0 libxkbcommon-dev libwayland-dev
-      - name: Install spirv-tools
-        run: |
-          mkdir "${HOME}/spirv-tools"
-          curl -fL https://storage.googleapis.com/spirv-tools/artifacts/prod/graphics_shader_compiler/spirv-tools/linux-clang-release/continuous/1305/20201026-063148/install.tgz | tar -xz -C "${HOME}/spirv-tools"
-          echo "${HOME}/spirv-tools/install/bin" >> $GITHUB_PATH
-      - name: Install rustup components
-        run: rustup component add rustfmt clippy rust-src rustc-dev llvm-tools-preview
-      - name: Rustfmt
-        run: cargo fmt --all -- --check
-      - name: cargo fetch
-        run: cargo fetch
-      - name: Clippy
-        run: .github/workflows/clippy.sh
+  # lint:
+  #   name: Lint
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     # Note that we are explicitly NOT checking out submodules, to validate
+  #     # that we haven't accidentally enabled spirv-tools native compilation
+  #     # and regressed CI times
+  #     - uses: actions/checkout@v2
+  #       with:
+  #         submodules: "false"
+  #     - name: Install native dependencies
+  #       run: sudo apt install libwayland-cursor0 libxkbcommon-dev libwayland-dev
+  #     - name: Install spirv-tools
+  #       run: |
+  #         mkdir "${HOME}/spirv-tools"
+  #         curl -fL https://storage.googleapis.com/spirv-tools/artifacts/prod/graphics_shader_compiler/spirv-tools/linux-clang-release/continuous/1305/20201026-063148/install.tgz | tar -xz -C "${HOME}/spirv-tools"
+  #         echo "${HOME}/spirv-tools/install/bin" >> $GITHUB_PATH
+  #     - name: Install rustup components
+  #       run: rustup component add rustfmt clippy rust-src rustc-dev llvm-tools-preview
+  #     - name: Rustfmt
+  #       run: cargo fmt --all -- --check
+  #     - name: cargo fetch
+  #       run: cargo fetch
+  #     - name: Clippy
+  #       run: .github/workflows/clippy.sh
 
-  cargo-deny:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: EmbarkStudios/cargo-deny-action@v1
+  # cargo-deny:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v2
+  #     - uses: EmbarkStudios/cargo-deny-action@v1
