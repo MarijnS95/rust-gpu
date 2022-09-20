@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":[["Passes",""]],"fn":[["create",""]],"mod":[["tool",""]],"struct":[["Options","Options for specifying the behavior of the optimizer"]],"trait":[["Optimizer",""]]};

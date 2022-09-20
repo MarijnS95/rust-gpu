@@ -1,0 +1,1152 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `crates/rustc_codegen_spirv/src/linker/structurizer.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>structurizer.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../main.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../../rustc_codegen_spirv/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../../rustc_codegen_spirv/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../rustc_codegen_spirv/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
+<span id="100">100</span>
+<span id="101">101</span>
+<span id="102">102</span>
+<span id="103">103</span>
+<span id="104">104</span>
+<span id="105">105</span>
+<span id="106">106</span>
+<span id="107">107</span>
+<span id="108">108</span>
+<span id="109">109</span>
+<span id="110">110</span>
+<span id="111">111</span>
+<span id="112">112</span>
+<span id="113">113</span>
+<span id="114">114</span>
+<span id="115">115</span>
+<span id="116">116</span>
+<span id="117">117</span>
+<span id="118">118</span>
+<span id="119">119</span>
+<span id="120">120</span>
+<span id="121">121</span>
+<span id="122">122</span>
+<span id="123">123</span>
+<span id="124">124</span>
+<span id="125">125</span>
+<span id="126">126</span>
+<span id="127">127</span>
+<span id="128">128</span>
+<span id="129">129</span>
+<span id="130">130</span>
+<span id="131">131</span>
+<span id="132">132</span>
+<span id="133">133</span>
+<span id="134">134</span>
+<span id="135">135</span>
+<span id="136">136</span>
+<span id="137">137</span>
+<span id="138">138</span>
+<span id="139">139</span>
+<span id="140">140</span>
+<span id="141">141</span>
+<span id="142">142</span>
+<span id="143">143</span>
+<span id="144">144</span>
+<span id="145">145</span>
+<span id="146">146</span>
+<span id="147">147</span>
+<span id="148">148</span>
+<span id="149">149</span>
+<span id="150">150</span>
+<span id="151">151</span>
+<span id="152">152</span>
+<span id="153">153</span>
+<span id="154">154</span>
+<span id="155">155</span>
+<span id="156">156</span>
+<span id="157">157</span>
+<span id="158">158</span>
+<span id="159">159</span>
+<span id="160">160</span>
+<span id="161">161</span>
+<span id="162">162</span>
+<span id="163">163</span>
+<span id="164">164</span>
+<span id="165">165</span>
+<span id="166">166</span>
+<span id="167">167</span>
+<span id="168">168</span>
+<span id="169">169</span>
+<span id="170">170</span>
+<span id="171">171</span>
+<span id="172">172</span>
+<span id="173">173</span>
+<span id="174">174</span>
+<span id="175">175</span>
+<span id="176">176</span>
+<span id="177">177</span>
+<span id="178">178</span>
+<span id="179">179</span>
+<span id="180">180</span>
+<span id="181">181</span>
+<span id="182">182</span>
+<span id="183">183</span>
+<span id="184">184</span>
+<span id="185">185</span>
+<span id="186">186</span>
+<span id="187">187</span>
+<span id="188">188</span>
+<span id="189">189</span>
+<span id="190">190</span>
+<span id="191">191</span>
+<span id="192">192</span>
+<span id="193">193</span>
+<span id="194">194</span>
+<span id="195">195</span>
+<span id="196">196</span>
+<span id="197">197</span>
+<span id="198">198</span>
+<span id="199">199</span>
+<span id="200">200</span>
+<span id="201">201</span>
+<span id="202">202</span>
+<span id="203">203</span>
+<span id="204">204</span>
+<span id="205">205</span>
+<span id="206">206</span>
+<span id="207">207</span>
+<span id="208">208</span>
+<span id="209">209</span>
+<span id="210">210</span>
+<span id="211">211</span>
+<span id="212">212</span>
+<span id="213">213</span>
+<span id="214">214</span>
+<span id="215">215</span>
+<span id="216">216</span>
+<span id="217">217</span>
+<span id="218">218</span>
+<span id="219">219</span>
+<span id="220">220</span>
+<span id="221">221</span>
+<span id="222">222</span>
+<span id="223">223</span>
+<span id="224">224</span>
+<span id="225">225</span>
+<span id="226">226</span>
+<span id="227">227</span>
+<span id="228">228</span>
+<span id="229">229</span>
+<span id="230">230</span>
+<span id="231">231</span>
+<span id="232">232</span>
+<span id="233">233</span>
+<span id="234">234</span>
+<span id="235">235</span>
+<span id="236">236</span>
+<span id="237">237</span>
+<span id="238">238</span>
+<span id="239">239</span>
+<span id="240">240</span>
+<span id="241">241</span>
+<span id="242">242</span>
+<span id="243">243</span>
+<span id="244">244</span>
+<span id="245">245</span>
+<span id="246">246</span>
+<span id="247">247</span>
+<span id="248">248</span>
+<span id="249">249</span>
+<span id="250">250</span>
+<span id="251">251</span>
+<span id="252">252</span>
+<span id="253">253</span>
+<span id="254">254</span>
+<span id="255">255</span>
+<span id="256">256</span>
+<span id="257">257</span>
+<span id="258">258</span>
+<span id="259">259</span>
+<span id="260">260</span>
+<span id="261">261</span>
+<span id="262">262</span>
+<span id="263">263</span>
+<span id="264">264</span>
+<span id="265">265</span>
+<span id="266">266</span>
+<span id="267">267</span>
+<span id="268">268</span>
+<span id="269">269</span>
+<span id="270">270</span>
+<span id="271">271</span>
+<span id="272">272</span>
+<span id="273">273</span>
+<span id="274">274</span>
+<span id="275">275</span>
+<span id="276">276</span>
+<span id="277">277</span>
+<span id="278">278</span>
+<span id="279">279</span>
+<span id="280">280</span>
+<span id="281">281</span>
+<span id="282">282</span>
+<span id="283">283</span>
+<span id="284">284</span>
+<span id="285">285</span>
+<span id="286">286</span>
+<span id="287">287</span>
+<span id="288">288</span>
+<span id="289">289</span>
+<span id="290">290</span>
+<span id="291">291</span>
+<span id="292">292</span>
+<span id="293">293</span>
+<span id="294">294</span>
+<span id="295">295</span>
+<span id="296">296</span>
+<span id="297">297</span>
+<span id="298">298</span>
+<span id="299">299</span>
+<span id="300">300</span>
+<span id="301">301</span>
+<span id="302">302</span>
+<span id="303">303</span>
+<span id="304">304</span>
+<span id="305">305</span>
+<span id="306">306</span>
+<span id="307">307</span>
+<span id="308">308</span>
+<span id="309">309</span>
+<span id="310">310</span>
+<span id="311">311</span>
+<span id="312">312</span>
+<span id="313">313</span>
+<span id="314">314</span>
+<span id="315">315</span>
+<span id="316">316</span>
+<span id="317">317</span>
+<span id="318">318</span>
+<span id="319">319</span>
+<span id="320">320</span>
+<span id="321">321</span>
+<span id="322">322</span>
+<span id="323">323</span>
+<span id="324">324</span>
+<span id="325">325</span>
+<span id="326">326</span>
+<span id="327">327</span>
+<span id="328">328</span>
+<span id="329">329</span>
+<span id="330">330</span>
+<span id="331">331</span>
+<span id="332">332</span>
+<span id="333">333</span>
+<span id="334">334</span>
+<span id="335">335</span>
+<span id="336">336</span>
+<span id="337">337</span>
+<span id="338">338</span>
+<span id="339">339</span>
+<span id="340">340</span>
+<span id="341">341</span>
+<span id="342">342</span>
+<span id="343">343</span>
+<span id="344">344</span>
+<span id="345">345</span>
+<span id="346">346</span>
+<span id="347">347</span>
+<span id="348">348</span>
+<span id="349">349</span>
+<span id="350">350</span>
+<span id="351">351</span>
+<span id="352">352</span>
+<span id="353">353</span>
+<span id="354">354</span>
+<span id="355">355</span>
+<span id="356">356</span>
+<span id="357">357</span>
+<span id="358">358</span>
+<span id="359">359</span>
+<span id="360">360</span>
+<span id="361">361</span>
+<span id="362">362</span>
+<span id="363">363</span>
+<span id="364">364</span>
+<span id="365">365</span>
+<span id="366">366</span>
+<span id="367">367</span>
+<span id="368">368</span>
+<span id="369">369</span>
+<span id="370">370</span>
+<span id="371">371</span>
+<span id="372">372</span>
+<span id="373">373</span>
+<span id="374">374</span>
+<span id="375">375</span>
+<span id="376">376</span>
+<span id="377">377</span>
+<span id="378">378</span>
+<span id="379">379</span>
+<span id="380">380</span>
+<span id="381">381</span>
+<span id="382">382</span>
+<span id="383">383</span>
+<span id="384">384</span>
+<span id="385">385</span>
+<span id="386">386</span>
+<span id="387">387</span>
+<span id="388">388</span>
+<span id="389">389</span>
+<span id="390">390</span>
+<span id="391">391</span>
+<span id="392">392</span>
+<span id="393">393</span>
+<span id="394">394</span>
+<span id="395">395</span>
+<span id="396">396</span>
+<span id="397">397</span>
+<span id="398">398</span>
+<span id="399">399</span>
+<span id="400">400</span>
+<span id="401">401</span>
+<span id="402">402</span>
+<span id="403">403</span>
+<span id="404">404</span>
+<span id="405">405</span>
+<span id="406">406</span>
+<span id="407">407</span>
+<span id="408">408</span>
+<span id="409">409</span>
+<span id="410">410</span>
+<span id="411">411</span>
+<span id="412">412</span>
+<span id="413">413</span>
+<span id="414">414</span>
+<span id="415">415</span>
+<span id="416">416</span>
+<span id="417">417</span>
+<span id="418">418</span>
+<span id="419">419</span>
+<span id="420">420</span>
+<span id="421">421</span>
+<span id="422">422</span>
+<span id="423">423</span>
+<span id="424">424</span>
+<span id="425">425</span>
+<span id="426">426</span>
+<span id="427">427</span>
+<span id="428">428</span>
+<span id="429">429</span>
+<span id="430">430</span>
+<span id="431">431</span>
+<span id="432">432</span>
+<span id="433">433</span>
+<span id="434">434</span>
+<span id="435">435</span>
+<span id="436">436</span>
+<span id="437">437</span>
+<span id="438">438</span>
+<span id="439">439</span>
+<span id="440">440</span>
+<span id="441">441</span>
+<span id="442">442</span>
+<span id="443">443</span>
+<span id="444">444</span>
+<span id="445">445</span>
+<span id="446">446</span>
+<span id="447">447</span>
+<span id="448">448</span>
+<span id="449">449</span>
+<span id="450">450</span>
+<span id="451">451</span>
+<span id="452">452</span>
+<span id="453">453</span>
+<span id="454">454</span>
+<span id="455">455</span>
+<span id="456">456</span>
+<span id="457">457</span>
+<span id="458">458</span>
+<span id="459">459</span>
+<span id="460">460</span>
+<span id="461">461</span>
+<span id="462">462</span>
+<span id="463">463</span>
+<span id="464">464</span>
+<span id="465">465</span>
+<span id="466">466</span>
+<span id="467">467</span>
+<span id="468">468</span>
+<span id="469">469</span>
+<span id="470">470</span>
+<span id="471">471</span>
+<span id="472">472</span>
+<span id="473">473</span>
+<span id="474">474</span>
+<span id="475">475</span>
+<span id="476">476</span>
+<span id="477">477</span>
+<span id="478">478</span>
+<span id="479">479</span>
+<span id="480">480</span>
+<span id="481">481</span>
+<span id="482">482</span>
+<span id="483">483</span>
+<span id="484">484</span>
+<span id="485">485</span>
+<span id="486">486</span>
+<span id="487">487</span>
+<span id="488">488</span>
+<span id="489">489</span>
+<span id="490">490</span>
+<span id="491">491</span>
+<span id="492">492</span>
+<span id="493">493</span>
+<span id="494">494</span>
+<span id="495">495</span>
+<span id="496">496</span>
+<span id="497">497</span>
+<span id="498">498</span>
+<span id="499">499</span>
+<span id="500">500</span>
+<span id="501">501</span>
+<span id="502">502</span>
+<span id="503">503</span>
+<span id="504">504</span>
+<span id="505">505</span>
+<span id="506">506</span>
+<span id="507">507</span>
+<span id="508">508</span>
+<span id="509">509</span>
+<span id="510">510</span>
+<span id="511">511</span>
+<span id="512">512</span>
+<span id="513">513</span>
+<span id="514">514</span>
+<span id="515">515</span>
+<span id="516">516</span>
+<span id="517">517</span>
+<span id="518">518</span>
+<span id="519">519</span>
+<span id="520">520</span>
+<span id="521">521</span>
+<span id="522">522</span>
+<span id="523">523</span>
+<span id="524">524</span>
+<span id="525">525</span>
+<span id="526">526</span>
+<span id="527">527</span>
+<span id="528">528</span>
+<span id="529">529</span>
+<span id="530">530</span>
+<span id="531">531</span>
+<span id="532">532</span>
+<span id="533">533</span>
+<span id="534">534</span>
+<span id="535">535</span>
+<span id="536">536</span>
+<span id="537">537</span>
+<span id="538">538</span>
+<span id="539">539</span>
+<span id="540">540</span>
+<span id="541">541</span>
+<span id="542">542</span>
+<span id="543">543</span>
+<span id="544">544</span>
+<span id="545">545</span>
+<span id="546">546</span>
+<span id="547">547</span>
+<span id="548">548</span>
+<span id="549">549</span>
+<span id="550">550</span>
+<span id="551">551</span>
+<span id="552">552</span>
+<span id="553">553</span>
+<span id="554">554</span>
+<span id="555">555</span>
+<span id="556">556</span>
+<span id="557">557</span>
+<span id="558">558</span>
+<span id="559">559</span>
+<span id="560">560</span>
+<span id="561">561</span>
+<span id="562">562</span>
+<span id="563">563</span>
+<span id="564">564</span>
+<span id="565">565</span>
+<span id="566">566</span>
+<span id="567">567</span>
+<span id="568">568</span>
+<span id="569">569</span>
+<span id="570">570</span>
+<span id="571">571</span>
+<span id="572">572</span>
+<span id="573">573</span>
+<span id="574">574</span>
+<span id="575">575</span>
+</pre><pre class="rust"><code><span class="kw">use </span>indexmap::{indexmap, IndexMap};
+<span class="kw">use </span>rspirv::dr::{Block, Builder, Function, InsertPoint, Module, Operand};
+<span class="kw">use </span>rspirv::spirv::{LoopControl, Op, SelectionControl, Word};
+<span class="kw">use </span>rustc_data_structures::fx::{FxHashMap, FxHashSet};
+<span class="kw">use </span>std::{iter, mem};
+
+<span class="doccomment">/// Cached IDs of `OpTypeBool`, `OpConstantFalse`, and `OpConstantTrue`.
+</span><span class="kw">struct </span>Globals {
+    type_bool: Word,
+    const_false: Word,
+    const_true: Word,
+}
+
+<span class="comment">// FIXME(eddyb) move this into some common module. Also consider whether we
+// actually need a &quot;builder&quot; or could just operate on a `&amp;mut Function`.
+</span><span class="kw">struct </span>FuncBuilder&lt;<span class="lifetime">&#39;a</span>&gt; {
+    builder: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw-2">mut </span>Builder,
+}
+
+<span class="kw">impl </span>FuncBuilder&lt;<span class="lifetime">&#39;_</span>&gt; {
+    <span class="kw">fn </span>function(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Function {
+        <span class="kw">let </span>func_idx = <span class="self">self</span>.builder.selected_function().unwrap();
+        <span class="kw-2">&amp;</span><span class="self">self</span>.builder.module_ref().functions[func_idx]
+    }
+
+    <span class="kw">fn </span>function_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>Function {
+        <span class="kw">let </span>func_idx = <span class="self">self</span>.builder.selected_function().unwrap();
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>.builder.module_mut().functions[func_idx]
+    }
+
+    <span class="kw">fn </span>blocks(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>[Block] {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.function().blocks
+    }
+
+    <span class="kw">fn </span>blocks_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>[Block] {
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>.function_mut().blocks
+    }
+}
+
+<span class="kw">pub fn </span>structurize(module: Module, unroll_loops_decorations: FxHashSet&lt;Word&gt;) -&gt; Module {
+    <span class="kw">let </span><span class="kw-2">mut </span>builder = Builder::new_from_module(module);
+
+    <span class="comment">// Get the `OpTypeBool` type (it will only be created if it&#39;s missing).
+    </span><span class="kw">let </span>type_bool = builder.type_bool();
+
+    <span class="comment">// Find already present `OpConstant{False,True}` (if they&#39;re in the module).
+    </span><span class="kw">let </span><span class="kw-2">mut </span>existing_const_false = <span class="prelude-val">None</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>existing_const_true = <span class="prelude-val">None</span>;
+    <span class="kw">for </span>inst <span class="kw">in </span><span class="kw-2">&amp;</span>builder.module_ref().types_global_values {
+        <span class="kw">let </span>existing = <span class="kw">match </span>inst.class.opcode {
+            Op::ConstantFalse =&gt; <span class="kw-2">&amp;mut </span>existing_const_false,
+            Op::ConstantTrue =&gt; <span class="kw-2">&amp;mut </span>existing_const_true,
+            <span class="kw">_ </span>=&gt; <span class="kw">continue</span>,
+        };
+
+        <span class="kw">if </span>existing.is_none() {
+            <span class="kw-2">*</span>existing = <span class="prelude-val">Some</span>(inst.result_id.unwrap());
+        }
+
+        <span class="kw">if </span>existing_const_false.is_some() &amp;&amp; existing_const_true.is_some() {
+            <span class="kw">break</span>;
+        }
+    }
+
+    <span class="comment">// Create new `OpConstant{False,True}` if they&#39;re missing.
+    </span><span class="kw">let </span>const_false = existing_const_false.unwrap_or_else(|| builder.constant_false(type_bool));
+    <span class="kw">let </span>const_true = existing_const_true.unwrap_or_else(|| builder.constant_true(type_bool));
+
+    <span class="kw">for </span>func_idx <span class="kw">in </span><span class="number">0</span>..builder.module_ref().functions.len() {
+        builder.select_function(<span class="prelude-val">Some</span>(func_idx)).unwrap();
+        <span class="kw">let </span>func = FuncBuilder {
+            builder: <span class="kw-2">&amp;mut </span>builder,
+        };
+
+        <span class="kw">let </span>func_id = func.function().def_id().unwrap();
+
+        <span class="kw">let </span>loop_control = <span class="kw">if </span>unroll_loops_decorations.contains(<span class="kw-2">&amp;</span>func_id) {
+            LoopControl::UNROLL
+        } <span class="kw">else </span>{
+            LoopControl::NONE
+        };
+
+        <span class="kw">let </span>block_id_to_idx = func
+            .blocks()
+            .iter()
+            .enumerate()
+            .map(|(i, block)| (block.label_id().unwrap(), i))
+            .collect();
+
+        Structurizer {
+            globals: Globals {
+                type_bool,
+                const_false,
+                const_true,
+            },
+            func,
+            block_id_to_idx,
+            loop_control,
+            incoming_edge_count: <span class="macro">vec!</span>[],
+            regions: FxHashMap::default(),
+        }
+        .structurize_func();
+    }
+
+    builder.module()
+}
+
+<span class="comment">// FIXME(eddyb) use newtyped indices and `IndexVec`.
+</span><span class="kw">type </span>BlockIdx = usize;
+<span class="kw">type </span>BlockId = Word;
+
+<span class="doccomment">/// Regions are made up of their entry block and all other blocks dominated
+/// by that block. All edges leaving a region are considered &quot;exits&quot;.
+</span><span class="kw">struct </span>Region {
+    <span class="doccomment">/// After structurizing a region, all paths through it must lead to a single
+    /// &quot;merge&quot; block (i.e. `merge` post-dominates the entire region).
+    /// The `merge` block must be terminated by one of `OpReturn`, `OpReturnValue`,
+    /// `OpKill`, `OpIgnoreIntersectionKHR`, `OpTerminateRayKHR` or
+    /// `OpUnreachable`. If `exits` isn&#39;t empty, `merge` will receive an
+    /// `OpBranch` from its parent region (to an outer merge block).
+    </span>merge: BlockIdx,
+    merge_id: BlockId,
+
+    exits: IndexMap&lt;BlockIdx, Exit&gt;,
+}
+
+<span class="attribute">#[derive(Default)]
+</span><span class="kw">struct </span>Exit {
+    <span class="doccomment">/// Number of total edges to this target (a subset of the target&#39;s predecessors).
+    </span>edge_count: usize,
+
+    <span class="doccomment">/// If this is a deferred exit, `condition` is a boolean value which must
+    /// be `true` in order to execute this exit.
+    </span>condition: <span class="prelude-ty">Option</span>&lt;Word&gt;,
+}
+
+<span class="kw">struct </span>Structurizer&lt;<span class="lifetime">&#39;a</span>&gt; {
+    globals: Globals,
+
+    func: FuncBuilder&lt;<span class="lifetime">&#39;a</span>&gt;,
+    block_id_to_idx: FxHashMap&lt;BlockId, BlockIdx&gt;,
+
+    <span class="doccomment">/// `LoopControl` to use in all loops&#39; `OpLoopMerge` instruction.
+    /// Currently only affected by function-scoped `#[spirv(unroll_loops)]`.
+    </span>loop_control: LoopControl,
+
+    <span class="doccomment">/// Number of edges pointing to each block.
+    /// Computed by `post_order` and updated when structuring loops
+    /// (backedge count is subtracted to hide them from outer regions).
+    </span>incoming_edge_count: Vec&lt;usize&gt;,
+
+    regions: FxHashMap&lt;BlockIdx, Region&gt;,
+}
+
+<span class="kw">impl </span>Structurizer&lt;<span class="lifetime">&#39;_</span>&gt; {
+    <span class="kw">fn </span>structurize_func(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="kw">let </span>Globals {
+            const_false,
+            const_true,
+            type_bool,
+        } = <span class="self">self</span>.globals;
+
+        <span class="comment">// By iterating in post-order, we are guaranteed to visit &quot;inner&quot; regions
+        // before &quot;outer&quot; ones.
+        </span><span class="kw">for </span>block <span class="kw">in </span><span class="self">self</span>.post_order() {
+            <span class="kw">let </span>block_id = <span class="self">self</span>.func.blocks()[block].label_id().unwrap();
+            <span class="kw">let </span>terminator = <span class="self">self</span>.func.blocks()[block].instructions.last().unwrap();
+            <span class="kw">let </span><span class="kw-2">mut </span>region = <span class="kw">match </span>terminator.class.opcode {
+                Op::Return
+                | Op::ReturnValue
+                | Op::Kill
+                | Op::IgnoreIntersectionKHR
+                | Op::TerminateRayKHR
+                | Op::Unreachable =&gt; Region {
+                    merge: block,
+                    merge_id: block_id,
+                    exits: <span class="macro">indexmap! </span>{},
+                },
+
+                Op::Branch =&gt; {
+                    <span class="kw">let </span>target = <span class="self">self</span>.block_id_to_idx[<span class="kw-2">&amp;</span>terminator.operands[<span class="number">0</span>].unwrap_id_ref()];
+                    <span class="self">self</span>.child_region(target).unwrap_or_else(|| {
+                        <span class="self">self</span>.func.builder.select_block(<span class="prelude-val">Some</span>(block)).unwrap();
+                        <span class="self">self</span>.func.builder.pop_instruction().unwrap();
+                        <span class="comment">// Default all merges to `OpUnreachable`, in case they&#39;re unused.
+                        </span><span class="self">self</span>.func.builder.unreachable().unwrap();
+                        Region {
+                            merge: block,
+                            merge_id: block_id,
+                            exits: <span class="macro">indexmap! </span>{
+                                target =&gt; Exit { edge_count: <span class="number">1</span>, condition: <span class="prelude-val">None </span>}
+                            },
+                        }
+                    })
+                }
+
+                Op::BranchConditional | Op::Switch =&gt; {
+                    <span class="kw">let </span>target_operand_indices = <span class="kw">match </span>terminator.class.opcode {
+                        Op::BranchConditional =&gt; (<span class="number">1</span>..<span class="number">3</span>).step_by(<span class="number">1</span>),
+                        Op::Switch =&gt; (<span class="number">1</span>..terminator.operands.len()).step_by(<span class="number">2</span>),
+                        <span class="kw">_ </span>=&gt; <span class="macro">unreachable!</span>(),
+                    };
+
+                    <span class="comment">// FIXME(eddyb) avoid wasteful allocation.
+                    </span><span class="kw">let </span>child_regions: Vec&lt;<span class="kw">_</span>&gt; = target_operand_indices
+                        .map(|i| {
+                            <span class="kw">let </span>target_id = <span class="self">self</span>.func.blocks()[block]
+                                .instructions
+                                .last()
+                                .unwrap()
+                                .operands[i]
+                                .unwrap_id_ref();
+                            <span class="kw">let </span>target = <span class="self">self</span>.block_id_to_idx[<span class="kw-2">&amp;</span>target_id];
+                            <span class="self">self</span>.child_region(target).unwrap_or_else(|| {
+                                <span class="comment">// Synthesize a single-block region for every edge that
+                                // doesn&#39;t already enter a child region, so that the
+                                // merge block we later generate has an unique source for
+                                // every single arm of this conditional branch or switch,
+                                // to attach per-exit condition phis to.
+                                </span><span class="kw">let </span>new_block_id = <span class="self">self</span>.func.builder.begin_block(<span class="prelude-val">None</span>).unwrap();
+                                <span class="kw">let </span>new_block = <span class="self">self</span>.func.builder.selected_block().unwrap();
+                                <span class="comment">// Default all merges to `OpUnreachable`, in case they&#39;re unused.
+                                </span><span class="self">self</span>.func.builder.unreachable().unwrap();
+                                <span class="self">self</span>.func.blocks_mut()[block]
+                                    .instructions
+                                    .last_mut()
+                                    .unwrap()
+                                    .operands[i] = Operand::IdRef(new_block_id);
+                                Region {
+                                    merge: new_block,
+                                    merge_id: new_block_id,
+                                    exits: <span class="macro">indexmap! </span>{
+                                        target =&gt; Exit { edge_count: <span class="number">1</span>, condition: <span class="prelude-val">None </span>}
+                                    },
+                                }
+                            })
+                        })
+                        .collect();
+
+                    <span class="self">self</span>.selection_merge_regions(block, <span class="kw-2">&amp;</span>child_regions)
+                }
+                <span class="kw">_ </span>=&gt; <span class="macro">panic!</span>(<span class="string">&quot;Invalid block terminator: {:?}&quot;</span>, terminator),
+            };
+
+            <span class="comment">// Peel off deferred exits which have all their edges accounted for
+            // already, within this region. Repeat until no such exits are left.
+            </span><span class="kw">while let </span><span class="prelude-val">Some</span>((<span class="kw-2">&amp;</span>target, <span class="kw">_</span>)) = region
+                .exits
+                .iter()
+                .find(|<span class="kw-2">&amp;</span>(<span class="kw-2">&amp;</span>target, exit)| exit.edge_count == <span class="self">self</span>.incoming_edge_count[target])
+            {
+                <span class="kw">let </span>taken_block_id = <span class="self">self</span>.func.blocks()[target].label_id().unwrap();
+                <span class="kw">let </span>exit = region.exits.remove(<span class="kw-2">&amp;</span>target).unwrap();
+
+                <span class="comment">// Special-case the last exit as unconditional - regardless of
+                // what might end up in `exit.condition`, what we&#39;d generate is
+                // `if exit.condition { branch target; } else { unreachable; }`
+                // which is just `branch target;` with an extra assumption that
+                // `exit.condition` is `true` (which we can just ignore).
+                </span><span class="kw">if </span>region.exits.is_empty() {
+                    <span class="self">self</span>.func.builder.select_block(<span class="prelude-val">Some</span>(region.merge)).unwrap();
+                    <span class="macro">assert_eq!</span>(
+                        <span class="self">self</span>.func.builder.pop_instruction().unwrap().class.opcode,
+                        Op::Unreachable
+                    );
+                    <span class="self">self</span>.func.builder.branch(taken_block_id).unwrap();
+                    region = <span class="self">self</span>.regions.remove(<span class="kw-2">&amp;</span>target).unwrap();
+                    <span class="kw">continue</span>;
+                }
+
+                <span class="comment">// Create a new block for the &quot;`exit` not taken&quot; path.
+                </span><span class="kw">let </span>not_taken_block_id = <span class="self">self</span>.func.builder.begin_block(<span class="prelude-val">None</span>).unwrap();
+                <span class="kw">let </span>not_taken_block = <span class="self">self</span>.func.builder.selected_block().unwrap();
+                <span class="comment">// Default all merges to `OpUnreachable`, in case they&#39;re unused.
+                </span><span class="self">self</span>.func.builder.unreachable().unwrap();
+
+                <span class="comment">// Choose whether to take this `exit`, in the previous merge block.
+                </span><span class="kw">let </span>branch_block = region.merge;
+                <span class="self">self</span>.func.builder.select_block(<span class="prelude-val">Some</span>(branch_block)).unwrap();
+                <span class="macro">assert_eq!</span>(
+                    <span class="self">self</span>.func.builder.pop_instruction().unwrap().class.opcode,
+                    Op::Unreachable
+                );
+                <span class="self">self</span>.func
+                    .builder
+                    .branch_conditional(
+                        exit.condition.unwrap(),
+                        taken_block_id,
+                        not_taken_block_id,
+                        iter::empty(),
+                    )
+                    .unwrap();
+
+                <span class="comment">// Merge the &quot;taken&quot; and &quot;not taken&quot; paths.
+                </span><span class="kw">let </span>taken_region = <span class="self">self</span>.regions.remove(<span class="kw-2">&amp;</span>target).unwrap();
+                <span class="kw">let </span>not_taken_region = Region {
+                    merge: not_taken_block,
+                    merge_id: not_taken_block_id,
+                    exits: region.exits,
+                };
+                region =
+                    <span class="self">self</span>.selection_merge_regions(branch_block, <span class="kw-2">&amp;</span>[taken_region, not_taken_region]);
+            }
+
+            <span class="comment">// Peel off a backedge exit, which indicates this region is a loop.
+            </span><span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">mut </span>backedge_exit) = region.exits.remove(<span class="kw-2">&amp;</span>block) {
+                <span class="comment">// Inject a `while`-like loop header just before the start of the
+                // loop body. This is needed because our &quot;`break` vs `continue`&quot;
+                // choice is *after* the loop body, like in a `do`-`while` loop,
+                // but SPIR-V requires it at the start, like in a `while` loop.
+                </span><span class="kw">let </span>while_header_block_id = <span class="self">self</span>.func.builder.begin_block(<span class="prelude-val">None</span>).unwrap();
+                <span class="kw">let </span>while_header_block = <span class="self">self</span>.func.builder.selected_block().unwrap();
+                <span class="self">self</span>.func.builder.select_block(<span class="prelude-val">None</span>).unwrap();
+                <span class="kw">let </span>while_exit_block_id = <span class="self">self</span>.func.builder.begin_block(<span class="prelude-val">None</span>).unwrap();
+                <span class="kw">let </span>while_exit_block = <span class="self">self</span>.func.builder.selected_block().unwrap();
+                <span class="comment">// Default all merges to `OpUnreachable`, in case they&#39;re unused.
+                </span><span class="self">self</span>.func.builder.unreachable().unwrap();
+                <span class="kw">let </span>while_body_block_id = <span class="self">self</span>.func.builder.begin_block(<span class="prelude-val">None</span>).unwrap();
+                <span class="kw">let </span>while_body_block = <span class="self">self</span>.func.builder.selected_block().unwrap();
+                <span class="self">self</span>.func.builder.select_block(<span class="prelude-val">None</span>).unwrap();
+
+                <span class="comment">// Move all of the contents of the original `block` into the
+                // new loop body, but keep labels and indices intact.
+                // Also update the existing merge if it happens to be the `block`
+                // we just moved (this should only be relevant to infinite loops).
+                </span><span class="self">self</span>.func.blocks_mut()[while_body_block].instructions =
+                    mem::take(<span class="kw-2">&amp;mut </span><span class="self">self</span>.func.blocks_mut()[block].instructions);
+                <span class="kw">if </span>region.merge == block {
+                    region.merge = while_body_block;
+                    region.merge_id = while_body_block_id;
+                }
+
+                <span class="comment">// Create a separate merge block for the loop body, as the original
+                // one might be used by an `OpSelectionMerge` and cannot be reused.
+                </span><span class="kw">let </span>while_body_merge_id = <span class="self">self</span>.func.builder.begin_block(<span class="prelude-val">None</span>).unwrap();
+                <span class="kw">let </span>while_body_merge = <span class="self">self</span>.func.builder.selected_block().unwrap();
+                <span class="self">self</span>.func.builder.select_block(<span class="prelude-val">None</span>).unwrap();
+                <span class="self">self</span>.func.builder.select_block(<span class="prelude-val">Some</span>(region.merge)).unwrap();
+                <span class="macro">assert_eq!</span>(
+                    <span class="self">self</span>.func.builder.pop_instruction().unwrap().class.opcode,
+                    Op::Unreachable
+                );
+                <span class="self">self</span>.func.builder.branch(while_body_merge_id).unwrap();
+
+                <span class="comment">// Point both the original block and the merge of the loop body,
+                // at the new loop header, and compute phis for all the exit
+                // conditions (including the backedge, which indicates &quot;continue&quot;).
+                </span><span class="self">self</span>.func.builder.select_block(<span class="prelude-val">Some</span>(block)).unwrap();
+                <span class="self">self</span>.func.builder.branch(while_header_block_id).unwrap();
+                <span class="self">self</span>.func
+                    .builder
+                    .select_block(<span class="prelude-val">Some</span>(while_body_merge))
+                    .unwrap();
+                <span class="self">self</span>.func.builder.branch(while_header_block_id).unwrap();
+                <span class="self">self</span>.func
+                    .builder
+                    .select_block(<span class="prelude-val">Some</span>(while_header_block))
+                    .unwrap();
+
+                <span class="kw">for </span>(<span class="kw-2">&amp;</span>target, exit) <span class="kw">in </span>region
+                    .exits
+                    .iter_mut()
+                    .chain(iter::once((<span class="kw-2">&amp;</span>while_body_block, <span class="kw-2">&amp;mut </span>backedge_exit)))
+                {
+                    <span class="kw">let </span>first_entry_case = (
+                        <span class="kw">if </span>target == while_body_block {
+                            const_true
+                        } <span class="kw">else </span>{
+                            const_false
+                        },
+                        block_id,
+                    );
+                    <span class="kw">let </span>repeat_case = (exit.condition.unwrap_or(const_true), while_body_merge_id);
+                    <span class="kw">let </span>phi_cases = [first_entry_case, repeat_case];
+                    exit.condition = <span class="prelude-val">Some</span>(
+                        <span class="self">self</span>.func
+                            .builder
+                            .phi(type_bool, <span class="prelude-val">None</span>, phi_cases.iter().copied())
+                            .unwrap(),
+                    );
+                }
+
+                <span class="comment">// Choose whether to keep looping, in the `while`-like loop header.
+                </span><span class="self">self</span>.func
+                    .builder
+                    .select_block(<span class="prelude-val">Some</span>(while_header_block))
+                    .unwrap();
+                <span class="self">self</span>.func
+                    .builder
+                    .loop_merge(
+                        while_exit_block_id,
+                        while_body_merge_id,
+                        <span class="self">self</span>.loop_control,
+                        iter::empty(),
+                    )
+                    .unwrap();
+                <span class="self">self</span>.func
+                    .builder
+                    .select_block(<span class="prelude-val">Some</span>(while_header_block))
+                    .unwrap();
+                <span class="self">self</span>.func
+                    .builder
+                    .branch_conditional(
+                        backedge_exit.condition.unwrap(),
+                        while_body_block_id,
+                        while_exit_block_id,
+                        iter::empty(),
+                    )
+                    .unwrap();
+                region.merge = while_exit_block;
+                region.merge_id = while_exit_block_id;
+
+                <span class="comment">// Remove the backedge count from the total incoming count of `block`.
+                // This will allow outer regions to treat the loop opaquely.
+                </span><span class="self">self</span>.incoming_edge_count[block] -= backedge_exit.edge_count;
+            }
+
+            <span class="self">self</span>.regions.insert(block, region);
+        }
+
+        <span class="macro">assert_eq!</span>(<span class="self">self</span>.regions.len(), <span class="number">1</span>);
+        <span class="macro">assert_eq!</span>(<span class="self">self</span>.regions.values().next().unwrap().exits.len(), <span class="number">0</span>);
+    }
+
+    <span class="kw">fn </span>child_region(<span class="kw-2">&amp;mut </span><span class="self">self</span>, target: BlockIdx) -&gt; <span class="prelude-ty">Option</span>&lt;Region&gt; {
+        <span class="comment">// An &quot;entry&quot; edge is the unique edge into a region.
+        </span><span class="kw">if </span><span class="self">self</span>.incoming_edge_count[target] == <span class="number">1 </span>{
+            <span class="prelude-val">Some</span>(<span class="self">self</span>.regions.remove(<span class="kw-2">&amp;</span>target).unwrap())
+        } <span class="kw">else </span>{
+            <span class="prelude-val">None
+        </span>}
+    }
+
+    <span class="kw">fn </span>selection_merge_regions(<span class="kw-2">&amp;mut </span><span class="self">self</span>, block: BlockIdx, child_regions: <span class="kw-2">&amp;</span>[Region]) -&gt; Region {
+        <span class="kw">let </span>Globals {
+            const_false,
+            const_true,
+            type_bool,
+        } = <span class="self">self</span>.globals;
+
+        <span class="comment">// HACK(eddyb) this special-cases the easy case where we can
+        // just reuse a merge block, and don&#39;t have to create our own.
+        </span><span class="kw">let </span>unconditional_single_exit = |region: <span class="kw-2">&amp;</span>Region| {
+            region.exits.len() == <span class="number">1 </span>&amp;&amp; region.exits.get_index(<span class="number">0</span>).unwrap().<span class="number">1</span>.condition.is_none()
+        };
+        <span class="kw">let </span>structural_merge = <span class="kw">if </span>child_regions.iter().all(unconditional_single_exit) {
+            <span class="kw">let </span>merge = <span class="kw-2">*</span>child_regions[<span class="number">0</span>].exits.get_index(<span class="number">0</span>).unwrap().<span class="number">0</span>;
+            <span class="kw">if </span>child_regions
+                .iter()
+                .all(|region| <span class="kw-2">*</span>region.exits.get_index(<span class="number">0</span>).unwrap().<span class="number">0 </span>== merge)
+                &amp;&amp; child_regions
+                    .iter()
+                    .map(|region| region.exits.get_index(<span class="number">0</span>).unwrap().<span class="number">1</span>.edge_count)
+                    .sum::&lt;usize&gt;()
+                    == <span class="self">self</span>.incoming_edge_count[merge]
+            {
+                <span class="prelude-val">Some</span>(merge)
+            } <span class="kw">else </span>{
+                <span class="prelude-val">None
+            </span>}
+        } <span class="kw">else </span>{
+            <span class="prelude-val">None
+        </span>};
+
+        <span class="comment">// Reuse or create a merge block, and use it as the selection merge.
+        </span><span class="kw">let </span>merge = structural_merge.unwrap_or_else(|| {
+            <span class="self">self</span>.func.builder.begin_block(<span class="prelude-val">None</span>).unwrap();
+            <span class="self">self</span>.func.builder.selected_block().unwrap()
+        });
+        <span class="kw">let </span>merge_id = <span class="self">self</span>.func.blocks()[merge].label_id().unwrap();
+        <span class="self">self</span>.func.builder.select_block(<span class="prelude-val">Some</span>(block)).unwrap();
+        <span class="self">self</span>.func
+            .builder
+            .insert_selection_merge(InsertPoint::FromEnd(<span class="number">1</span>), merge_id, SelectionControl::NONE)
+            .unwrap();
+
+        <span class="comment">// Branch all the child regions into our merge block.
+        </span><span class="kw">for </span>region <span class="kw">in </span>child_regions {
+            <span class="comment">// HACK(eddyb) empty `region.exits` indicate diverging control-flow,
+            // and that we should ignore `region.merge`.
+            </span><span class="kw">if </span>!region.exits.is_empty() {
+                <span class="self">self</span>.func.builder.select_block(<span class="prelude-val">Some</span>(region.merge)).unwrap();
+                <span class="macro">assert_eq!</span>(
+                    <span class="self">self</span>.func.builder.pop_instruction().unwrap().class.opcode,
+                    Op::Unreachable
+                );
+                <span class="self">self</span>.func.builder.branch(merge_id).unwrap();
+            }
+        }
+
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(merge) = structural_merge {
+            <span class="self">self</span>.regions.remove(<span class="kw-2">&amp;</span>merge).unwrap()
+        } <span class="kw">else </span>{
+            <span class="self">self</span>.func.builder.select_block(<span class="prelude-val">Some</span>(merge)).unwrap();
+
+            <span class="comment">// Gather all the potential exits.
+            </span><span class="kw">let </span><span class="kw-2">mut </span>exits: IndexMap&lt;BlockIdx, Exit&gt; = <span class="macro">indexmap! </span>{};
+            <span class="kw">for </span>region <span class="kw">in </span>child_regions {
+                <span class="kw">for </span>(<span class="kw-2">&amp;</span>target, exit) <span class="kw">in </span><span class="kw-2">&amp;</span>region.exits {
+                    exits.entry(target).or_default().edge_count += exit.edge_count;
+                }
+            }
+
+            <span class="comment">// Update conditions using phis.
+            </span><span class="kw">for </span>(<span class="kw-2">&amp;</span>target, exit) <span class="kw">in </span><span class="kw-2">&amp;mut </span>exits {
+                <span class="kw">let </span>phi_cases = child_regions
+                    .iter()
+                    .filter(|region| {
+                        <span class="comment">// HACK(eddyb) empty `region.exits` indicate diverging control-flow,
+                        // and that we should ignore `region.merge`.
+                        </span>!region.exits.is_empty()
+                    })
+                    .map(|region| {
+                        (
+                            <span class="kw">match </span>region.exits.get(<span class="kw-2">&amp;</span>target) {
+                                <span class="prelude-val">Some</span>(exit) =&gt; exit.condition.unwrap_or(const_true),
+                                <span class="prelude-val">None </span>=&gt; const_false,
+                            },
+                            region.merge_id,
+                        )
+                    });
+                exit.condition = <span class="prelude-val">Some</span>(<span class="self">self</span>.func.builder.phi(type_bool, <span class="prelude-val">None</span>, phi_cases).unwrap());
+            }
+
+            <span class="comment">// Default all merges to `OpUnreachable`, in case they&#39;re unused.
+            </span><span class="self">self</span>.func.builder.unreachable().unwrap();
+
+            Region {
+                merge,
+                merge_id,
+                exits,
+            }
+        }
+    }
+
+    <span class="comment">// FIXME(eddyb) replace this with `rustc_data_structures::graph::iterate`
+    // (or similar).
+    </span><span class="kw">fn </span>post_order(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; Vec&lt;BlockIdx&gt; {
+        <span class="kw">let </span>blocks = <span class="self">self</span>.func.blocks();
+
+        <span class="comment">// HACK(eddyb) compute edge counts through the post-order traversal.
+        </span><span class="macro">assert!</span>(<span class="self">self</span>.incoming_edge_count.is_empty());
+        <span class="self">self</span>.incoming_edge_count = <span class="macro">vec!</span>[<span class="number">0</span>; blocks.len()];
+
+        <span class="comment">// FIXME(eddyb) use a proper bitset.
+        </span><span class="kw">let </span><span class="kw-2">mut </span>visited = <span class="macro">vec!</span>[<span class="bool-val">false</span>; blocks.len()];
+        <span class="kw">let </span><span class="kw-2">mut </span>post_order = Vec::with_capacity(blocks.len());
+
+        <span class="self">self</span>.post_order_step(<span class="number">0</span>, <span class="kw-2">&amp;mut </span>visited, <span class="kw-2">&amp;mut </span>post_order);
+
+        post_order
+    }
+
+    <span class="kw">fn </span>post_order_step(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        block: BlockIdx,
+        visited: <span class="kw-2">&amp;mut </span>[bool],
+        post_order: <span class="kw-2">&amp;mut </span>Vec&lt;BlockIdx&gt;,
+    ) {
+        <span class="self">self</span>.incoming_edge_count[block] += <span class="number">1</span>;
+
+        <span class="kw">if </span>visited[block] {
+            <span class="kw">return</span>;
+        }
+        visited[block] = <span class="bool-val">true</span>;
+
+        <span class="kw">for </span>target <span class="kw">in
+            </span><span class="kw">super</span>::simple_passes::outgoing_edges(<span class="kw-2">&amp;</span><span class="self">self</span>.func.blocks()[block]).collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;()
+        {
+            <span class="self">self</span>.post_order_step(<span class="self">self</span>.block_id_to_idx[<span class="kw-2">&amp;</span>target], visited, post_order);
+        }
+
+        post_order.push(block);
+    }
+}
+</code></pre></div>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="rustc_codegen_spirv" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (c0941dfb5 2022-08-21)" ></div></body></html>

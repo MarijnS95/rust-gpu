@@ -1,0 +1,1192 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `crates/rustc_codegen_spirv/src/codegen_cx/constant.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>constant.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../main.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../../rustc_codegen_spirv/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../../rustc_codegen_spirv/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../rustc_codegen_spirv/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
+<span id="100">100</span>
+<span id="101">101</span>
+<span id="102">102</span>
+<span id="103">103</span>
+<span id="104">104</span>
+<span id="105">105</span>
+<span id="106">106</span>
+<span id="107">107</span>
+<span id="108">108</span>
+<span id="109">109</span>
+<span id="110">110</span>
+<span id="111">111</span>
+<span id="112">112</span>
+<span id="113">113</span>
+<span id="114">114</span>
+<span id="115">115</span>
+<span id="116">116</span>
+<span id="117">117</span>
+<span id="118">118</span>
+<span id="119">119</span>
+<span id="120">120</span>
+<span id="121">121</span>
+<span id="122">122</span>
+<span id="123">123</span>
+<span id="124">124</span>
+<span id="125">125</span>
+<span id="126">126</span>
+<span id="127">127</span>
+<span id="128">128</span>
+<span id="129">129</span>
+<span id="130">130</span>
+<span id="131">131</span>
+<span id="132">132</span>
+<span id="133">133</span>
+<span id="134">134</span>
+<span id="135">135</span>
+<span id="136">136</span>
+<span id="137">137</span>
+<span id="138">138</span>
+<span id="139">139</span>
+<span id="140">140</span>
+<span id="141">141</span>
+<span id="142">142</span>
+<span id="143">143</span>
+<span id="144">144</span>
+<span id="145">145</span>
+<span id="146">146</span>
+<span id="147">147</span>
+<span id="148">148</span>
+<span id="149">149</span>
+<span id="150">150</span>
+<span id="151">151</span>
+<span id="152">152</span>
+<span id="153">153</span>
+<span id="154">154</span>
+<span id="155">155</span>
+<span id="156">156</span>
+<span id="157">157</span>
+<span id="158">158</span>
+<span id="159">159</span>
+<span id="160">160</span>
+<span id="161">161</span>
+<span id="162">162</span>
+<span id="163">163</span>
+<span id="164">164</span>
+<span id="165">165</span>
+<span id="166">166</span>
+<span id="167">167</span>
+<span id="168">168</span>
+<span id="169">169</span>
+<span id="170">170</span>
+<span id="171">171</span>
+<span id="172">172</span>
+<span id="173">173</span>
+<span id="174">174</span>
+<span id="175">175</span>
+<span id="176">176</span>
+<span id="177">177</span>
+<span id="178">178</span>
+<span id="179">179</span>
+<span id="180">180</span>
+<span id="181">181</span>
+<span id="182">182</span>
+<span id="183">183</span>
+<span id="184">184</span>
+<span id="185">185</span>
+<span id="186">186</span>
+<span id="187">187</span>
+<span id="188">188</span>
+<span id="189">189</span>
+<span id="190">190</span>
+<span id="191">191</span>
+<span id="192">192</span>
+<span id="193">193</span>
+<span id="194">194</span>
+<span id="195">195</span>
+<span id="196">196</span>
+<span id="197">197</span>
+<span id="198">198</span>
+<span id="199">199</span>
+<span id="200">200</span>
+<span id="201">201</span>
+<span id="202">202</span>
+<span id="203">203</span>
+<span id="204">204</span>
+<span id="205">205</span>
+<span id="206">206</span>
+<span id="207">207</span>
+<span id="208">208</span>
+<span id="209">209</span>
+<span id="210">210</span>
+<span id="211">211</span>
+<span id="212">212</span>
+<span id="213">213</span>
+<span id="214">214</span>
+<span id="215">215</span>
+<span id="216">216</span>
+<span id="217">217</span>
+<span id="218">218</span>
+<span id="219">219</span>
+<span id="220">220</span>
+<span id="221">221</span>
+<span id="222">222</span>
+<span id="223">223</span>
+<span id="224">224</span>
+<span id="225">225</span>
+<span id="226">226</span>
+<span id="227">227</span>
+<span id="228">228</span>
+<span id="229">229</span>
+<span id="230">230</span>
+<span id="231">231</span>
+<span id="232">232</span>
+<span id="233">233</span>
+<span id="234">234</span>
+<span id="235">235</span>
+<span id="236">236</span>
+<span id="237">237</span>
+<span id="238">238</span>
+<span id="239">239</span>
+<span id="240">240</span>
+<span id="241">241</span>
+<span id="242">242</span>
+<span id="243">243</span>
+<span id="244">244</span>
+<span id="245">245</span>
+<span id="246">246</span>
+<span id="247">247</span>
+<span id="248">248</span>
+<span id="249">249</span>
+<span id="250">250</span>
+<span id="251">251</span>
+<span id="252">252</span>
+<span id="253">253</span>
+<span id="254">254</span>
+<span id="255">255</span>
+<span id="256">256</span>
+<span id="257">257</span>
+<span id="258">258</span>
+<span id="259">259</span>
+<span id="260">260</span>
+<span id="261">261</span>
+<span id="262">262</span>
+<span id="263">263</span>
+<span id="264">264</span>
+<span id="265">265</span>
+<span id="266">266</span>
+<span id="267">267</span>
+<span id="268">268</span>
+<span id="269">269</span>
+<span id="270">270</span>
+<span id="271">271</span>
+<span id="272">272</span>
+<span id="273">273</span>
+<span id="274">274</span>
+<span id="275">275</span>
+<span id="276">276</span>
+<span id="277">277</span>
+<span id="278">278</span>
+<span id="279">279</span>
+<span id="280">280</span>
+<span id="281">281</span>
+<span id="282">282</span>
+<span id="283">283</span>
+<span id="284">284</span>
+<span id="285">285</span>
+<span id="286">286</span>
+<span id="287">287</span>
+<span id="288">288</span>
+<span id="289">289</span>
+<span id="290">290</span>
+<span id="291">291</span>
+<span id="292">292</span>
+<span id="293">293</span>
+<span id="294">294</span>
+<span id="295">295</span>
+<span id="296">296</span>
+<span id="297">297</span>
+<span id="298">298</span>
+<span id="299">299</span>
+<span id="300">300</span>
+<span id="301">301</span>
+<span id="302">302</span>
+<span id="303">303</span>
+<span id="304">304</span>
+<span id="305">305</span>
+<span id="306">306</span>
+<span id="307">307</span>
+<span id="308">308</span>
+<span id="309">309</span>
+<span id="310">310</span>
+<span id="311">311</span>
+<span id="312">312</span>
+<span id="313">313</span>
+<span id="314">314</span>
+<span id="315">315</span>
+<span id="316">316</span>
+<span id="317">317</span>
+<span id="318">318</span>
+<span id="319">319</span>
+<span id="320">320</span>
+<span id="321">321</span>
+<span id="322">322</span>
+<span id="323">323</span>
+<span id="324">324</span>
+<span id="325">325</span>
+<span id="326">326</span>
+<span id="327">327</span>
+<span id="328">328</span>
+<span id="329">329</span>
+<span id="330">330</span>
+<span id="331">331</span>
+<span id="332">332</span>
+<span id="333">333</span>
+<span id="334">334</span>
+<span id="335">335</span>
+<span id="336">336</span>
+<span id="337">337</span>
+<span id="338">338</span>
+<span id="339">339</span>
+<span id="340">340</span>
+<span id="341">341</span>
+<span id="342">342</span>
+<span id="343">343</span>
+<span id="344">344</span>
+<span id="345">345</span>
+<span id="346">346</span>
+<span id="347">347</span>
+<span id="348">348</span>
+<span id="349">349</span>
+<span id="350">350</span>
+<span id="351">351</span>
+<span id="352">352</span>
+<span id="353">353</span>
+<span id="354">354</span>
+<span id="355">355</span>
+<span id="356">356</span>
+<span id="357">357</span>
+<span id="358">358</span>
+<span id="359">359</span>
+<span id="360">360</span>
+<span id="361">361</span>
+<span id="362">362</span>
+<span id="363">363</span>
+<span id="364">364</span>
+<span id="365">365</span>
+<span id="366">366</span>
+<span id="367">367</span>
+<span id="368">368</span>
+<span id="369">369</span>
+<span id="370">370</span>
+<span id="371">371</span>
+<span id="372">372</span>
+<span id="373">373</span>
+<span id="374">374</span>
+<span id="375">375</span>
+<span id="376">376</span>
+<span id="377">377</span>
+<span id="378">378</span>
+<span id="379">379</span>
+<span id="380">380</span>
+<span id="381">381</span>
+<span id="382">382</span>
+<span id="383">383</span>
+<span id="384">384</span>
+<span id="385">385</span>
+<span id="386">386</span>
+<span id="387">387</span>
+<span id="388">388</span>
+<span id="389">389</span>
+<span id="390">390</span>
+<span id="391">391</span>
+<span id="392">392</span>
+<span id="393">393</span>
+<span id="394">394</span>
+<span id="395">395</span>
+<span id="396">396</span>
+<span id="397">397</span>
+<span id="398">398</span>
+<span id="399">399</span>
+<span id="400">400</span>
+<span id="401">401</span>
+<span id="402">402</span>
+<span id="403">403</span>
+<span id="404">404</span>
+<span id="405">405</span>
+<span id="406">406</span>
+<span id="407">407</span>
+<span id="408">408</span>
+<span id="409">409</span>
+<span id="410">410</span>
+<span id="411">411</span>
+<span id="412">412</span>
+<span id="413">413</span>
+<span id="414">414</span>
+<span id="415">415</span>
+<span id="416">416</span>
+<span id="417">417</span>
+<span id="418">418</span>
+<span id="419">419</span>
+<span id="420">420</span>
+<span id="421">421</span>
+<span id="422">422</span>
+<span id="423">423</span>
+<span id="424">424</span>
+<span id="425">425</span>
+<span id="426">426</span>
+<span id="427">427</span>
+<span id="428">428</span>
+<span id="429">429</span>
+<span id="430">430</span>
+<span id="431">431</span>
+<span id="432">432</span>
+<span id="433">433</span>
+<span id="434">434</span>
+<span id="435">435</span>
+<span id="436">436</span>
+<span id="437">437</span>
+<span id="438">438</span>
+<span id="439">439</span>
+<span id="440">440</span>
+<span id="441">441</span>
+<span id="442">442</span>
+<span id="443">443</span>
+<span id="444">444</span>
+<span id="445">445</span>
+<span id="446">446</span>
+<span id="447">447</span>
+<span id="448">448</span>
+<span id="449">449</span>
+<span id="450">450</span>
+<span id="451">451</span>
+<span id="452">452</span>
+<span id="453">453</span>
+<span id="454">454</span>
+<span id="455">455</span>
+<span id="456">456</span>
+<span id="457">457</span>
+<span id="458">458</span>
+<span id="459">459</span>
+<span id="460">460</span>
+<span id="461">461</span>
+<span id="462">462</span>
+<span id="463">463</span>
+<span id="464">464</span>
+<span id="465">465</span>
+<span id="466">466</span>
+<span id="467">467</span>
+<span id="468">468</span>
+<span id="469">469</span>
+<span id="470">470</span>
+<span id="471">471</span>
+<span id="472">472</span>
+<span id="473">473</span>
+<span id="474">474</span>
+<span id="475">475</span>
+<span id="476">476</span>
+<span id="477">477</span>
+<span id="478">478</span>
+<span id="479">479</span>
+<span id="480">480</span>
+<span id="481">481</span>
+<span id="482">482</span>
+<span id="483">483</span>
+<span id="484">484</span>
+<span id="485">485</span>
+<span id="486">486</span>
+<span id="487">487</span>
+<span id="488">488</span>
+<span id="489">489</span>
+<span id="490">490</span>
+<span id="491">491</span>
+<span id="492">492</span>
+<span id="493">493</span>
+<span id="494">494</span>
+<span id="495">495</span>
+<span id="496">496</span>
+<span id="497">497</span>
+<span id="498">498</span>
+<span id="499">499</span>
+<span id="500">500</span>
+<span id="501">501</span>
+<span id="502">502</span>
+<span id="503">503</span>
+<span id="504">504</span>
+<span id="505">505</span>
+<span id="506">506</span>
+<span id="507">507</span>
+<span id="508">508</span>
+<span id="509">509</span>
+<span id="510">510</span>
+<span id="511">511</span>
+<span id="512">512</span>
+<span id="513">513</span>
+<span id="514">514</span>
+<span id="515">515</span>
+<span id="516">516</span>
+<span id="517">517</span>
+<span id="518">518</span>
+<span id="519">519</span>
+<span id="520">520</span>
+<span id="521">521</span>
+<span id="522">522</span>
+<span id="523">523</span>
+<span id="524">524</span>
+<span id="525">525</span>
+<span id="526">526</span>
+<span id="527">527</span>
+<span id="528">528</span>
+<span id="529">529</span>
+<span id="530">530</span>
+<span id="531">531</span>
+<span id="532">532</span>
+<span id="533">533</span>
+<span id="534">534</span>
+<span id="535">535</span>
+<span id="536">536</span>
+<span id="537">537</span>
+<span id="538">538</span>
+<span id="539">539</span>
+<span id="540">540</span>
+<span id="541">541</span>
+<span id="542">542</span>
+<span id="543">543</span>
+<span id="544">544</span>
+<span id="545">545</span>
+<span id="546">546</span>
+<span id="547">547</span>
+<span id="548">548</span>
+<span id="549">549</span>
+<span id="550">550</span>
+<span id="551">551</span>
+<span id="552">552</span>
+<span id="553">553</span>
+<span id="554">554</span>
+<span id="555">555</span>
+<span id="556">556</span>
+<span id="557">557</span>
+<span id="558">558</span>
+<span id="559">559</span>
+<span id="560">560</span>
+<span id="561">561</span>
+<span id="562">562</span>
+<span id="563">563</span>
+<span id="564">564</span>
+<span id="565">565</span>
+<span id="566">566</span>
+<span id="567">567</span>
+<span id="568">568</span>
+<span id="569">569</span>
+<span id="570">570</span>
+<span id="571">571</span>
+<span id="572">572</span>
+<span id="573">573</span>
+<span id="574">574</span>
+<span id="575">575</span>
+<span id="576">576</span>
+<span id="577">577</span>
+<span id="578">578</span>
+<span id="579">579</span>
+<span id="580">580</span>
+<span id="581">581</span>
+<span id="582">582</span>
+<span id="583">583</span>
+<span id="584">584</span>
+<span id="585">585</span>
+<span id="586">586</span>
+<span id="587">587</span>
+<span id="588">588</span>
+<span id="589">589</span>
+<span id="590">590</span>
+<span id="591">591</span>
+<span id="592">592</span>
+<span id="593">593</span>
+<span id="594">594</span>
+<span id="595">595</span>
+</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::CodegenCx;
+<span class="kw">use </span><span class="kw">crate</span>::abi::ConvSpirvType;
+<span class="kw">use </span><span class="kw">crate</span>::builder_spirv::{SpirvConst, SpirvValue, SpirvValueExt};
+<span class="kw">use </span><span class="kw">crate</span>::spirv_type::SpirvType;
+<span class="kw">use </span>rspirv::spirv::Word;
+<span class="kw">use </span>rustc_codegen_ssa::mir::place::PlaceRef;
+<span class="kw">use </span>rustc_codegen_ssa::traits::{BaseTypeMethods, ConstMethods, MiscMethods, StaticMethods};
+<span class="kw">use </span>rustc_middle::bug;
+<span class="kw">use </span>rustc_middle::mir::interpret::{
+    alloc_range, ConstAllocation, GlobalAlloc, Scalar, ScalarMaybeUninit,
+};
+<span class="kw">use </span>rustc_middle::ty::layout::{LayoutOf, TyAndLayout};
+<span class="kw">use </span>rustc_span::{Span, DUMMY_SP};
+<span class="kw">use </span>rustc_target::abi::{<span class="self">self</span>, AddressSpace, HasDataLayout, Integer, Primitive, Size};
+
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;tcx</span>&gt; CodegenCx&lt;<span class="lifetime">&#39;tcx</span>&gt; {
+    <span class="kw">pub fn </span>constant_u8(<span class="kw-2">&amp;</span><span class="self">self</span>, span: Span, val: u8) -&gt; SpirvValue {
+        <span class="kw">let </span>ty = SpirvType::Integer(<span class="number">8</span>, <span class="bool-val">false</span>).def(span, <span class="self">self</span>);
+        <span class="self">self</span>.builder.def_constant(ty, SpirvConst::U32(val <span class="kw">as </span>u32))
+    }
+
+    <span class="kw">pub fn </span>constant_i16(<span class="kw-2">&amp;</span><span class="self">self</span>, span: Span, val: i16) -&gt; SpirvValue {
+        <span class="kw">let </span>ty = SpirvType::Integer(<span class="number">16</span>, <span class="bool-val">true</span>).def(span, <span class="self">self</span>);
+        <span class="self">self</span>.builder.def_constant(ty, SpirvConst::U32(val <span class="kw">as </span>u32))
+    }
+
+    <span class="kw">pub fn </span>constant_u16(<span class="kw-2">&amp;</span><span class="self">self</span>, span: Span, val: u16) -&gt; SpirvValue {
+        <span class="kw">let </span>ty = SpirvType::Integer(<span class="number">16</span>, <span class="bool-val">false</span>).def(span, <span class="self">self</span>);
+        <span class="self">self</span>.builder.def_constant(ty, SpirvConst::U32(val <span class="kw">as </span>u32))
+    }
+
+    <span class="kw">pub fn </span>constant_i32(<span class="kw-2">&amp;</span><span class="self">self</span>, span: Span, val: i32) -&gt; SpirvValue {
+        <span class="kw">let </span>ty = SpirvType::Integer(<span class="number">32</span>, <span class="bool-val">true</span>).def(span, <span class="self">self</span>);
+        <span class="self">self</span>.builder.def_constant(ty, SpirvConst::U32(val <span class="kw">as </span>u32))
+    }
+
+    <span class="kw">pub fn </span>constant_u32(<span class="kw-2">&amp;</span><span class="self">self</span>, span: Span, val: u32) -&gt; SpirvValue {
+        <span class="kw">let </span>ty = SpirvType::Integer(<span class="number">32</span>, <span class="bool-val">false</span>).def(span, <span class="self">self</span>);
+        <span class="self">self</span>.builder.def_constant(ty, SpirvConst::U32(val))
+    }
+
+    <span class="kw">pub fn </span>constant_u64(<span class="kw-2">&amp;</span><span class="self">self</span>, span: Span, val: u64) -&gt; SpirvValue {
+        <span class="kw">let </span>ty = SpirvType::Integer(<span class="number">64</span>, <span class="bool-val">false</span>).def(span, <span class="self">self</span>);
+        <span class="self">self</span>.builder.def_constant(ty, SpirvConst::U64(val))
+    }
+
+    <span class="kw">pub fn </span>constant_int(<span class="kw-2">&amp;</span><span class="self">self</span>, ty: Word, val: u64) -&gt; SpirvValue {
+        <span class="kw">match </span><span class="self">self</span>.lookup_type(ty) {
+            SpirvType::Integer(bits @ <span class="number">8</span>..=<span class="number">32</span>, signed) =&gt; {
+                <span class="kw">let </span>size = Size::from_bits(bits);
+                <span class="kw">let </span>val = val <span class="kw">as </span>u128;
+                <span class="self">self</span>.builder.def_constant(
+                    ty,
+                    SpirvConst::U32(<span class="kw">if </span>signed {
+                        size.sign_extend(val)
+                    } <span class="kw">else </span>{
+                        size.truncate(val)
+                    } <span class="kw">as </span>u32),
+                )
+            }
+            SpirvType::Integer(<span class="number">64</span>, <span class="kw">_</span>) =&gt; <span class="self">self</span>.builder.def_constant(ty, SpirvConst::U64(val)),
+            SpirvType::Bool =&gt; <span class="kw">match </span>val {
+                <span class="number">0 </span>| <span class="number">1 </span>=&gt; <span class="self">self</span>.builder.def_constant(ty, SpirvConst::Bool(val != <span class="number">0</span>)),
+                <span class="kw">_ </span>=&gt; <span class="self">self
+                    </span>.tcx
+                    .sess
+                    .fatal(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;Invalid constant value for bool: {}&quot;</span>, val)),
+            },
+            SpirvType::Integer(<span class="number">128</span>, <span class="kw">_</span>) =&gt; {
+                <span class="kw">let </span>result = <span class="self">self</span>.undef(ty);
+                <span class="self">self</span>.zombie_no_span(result.def_cx(<span class="self">self</span>), <span class="string">&quot;u128 constant&quot;</span>);
+                result
+            }
+            other =&gt; <span class="self">self</span>.tcx.sess.fatal(<span class="kw-2">&amp;</span><span class="macro">format!</span>(
+                <span class="string">&quot;constant_int invalid on type {}&quot;</span>,
+                other.debug(ty, <span class="self">self</span>)
+            )),
+        }
+    }
+
+    <span class="kw">pub fn </span>constant_f32(<span class="kw-2">&amp;</span><span class="self">self</span>, span: Span, val: f32) -&gt; SpirvValue {
+        <span class="kw">let </span>ty = SpirvType::Float(<span class="number">32</span>).def(span, <span class="self">self</span>);
+        <span class="self">self</span>.builder
+            .def_constant(ty, SpirvConst::F32(val.to_bits()))
+    }
+
+    <span class="kw">pub fn </span>constant_f64(<span class="kw-2">&amp;</span><span class="self">self</span>, span: Span, val: f64) -&gt; SpirvValue {
+        <span class="kw">let </span>ty = SpirvType::Float(<span class="number">64</span>).def(span, <span class="self">self</span>);
+        <span class="self">self</span>.builder
+            .def_constant(ty, SpirvConst::F64(val.to_bits()))
+    }
+
+    <span class="kw">pub fn </span>constant_float(<span class="kw-2">&amp;</span><span class="self">self</span>, ty: Word, val: f64) -&gt; SpirvValue {
+        <span class="kw">match </span><span class="self">self</span>.lookup_type(ty) {
+            SpirvType::Float(<span class="number">32</span>) =&gt; <span class="self">self
+                </span>.builder
+                .def_constant(ty, SpirvConst::F32((val <span class="kw">as </span>f32).to_bits())),
+            SpirvType::Float(<span class="number">64</span>) =&gt; <span class="self">self
+                </span>.builder
+                .def_constant(ty, SpirvConst::F64(val.to_bits())),
+            other =&gt; <span class="self">self</span>.tcx.sess.fatal(<span class="kw-2">&amp;</span><span class="macro">format!</span>(
+                <span class="string">&quot;constant_float invalid on type {}&quot;</span>,
+                other.debug(ty, <span class="self">self</span>)
+            )),
+        }
+    }
+
+    <span class="kw">pub fn </span>constant_bool(<span class="kw-2">&amp;</span><span class="self">self</span>, span: Span, val: bool) -&gt; SpirvValue {
+        <span class="kw">let </span>ty = SpirvType::Bool.def(span, <span class="self">self</span>);
+        <span class="self">self</span>.builder.def_constant(ty, SpirvConst::Bool(val))
+    }
+
+    <span class="kw">pub fn </span>constant_composite(<span class="kw-2">&amp;</span><span class="self">self</span>, ty: Word, fields: <span class="kw">impl </span>Iterator&lt;Item = Word&gt;) -&gt; SpirvValue {
+        <span class="self">self</span>.builder
+            .def_constant(ty, SpirvConst::Composite(fields.collect()))
+    }
+
+    <span class="kw">pub fn </span>constant_null(<span class="kw-2">&amp;</span><span class="self">self</span>, ty: Word) -&gt; SpirvValue {
+        <span class="self">self</span>.builder.def_constant(ty, SpirvConst::Null)
+    }
+
+    <span class="kw">pub fn </span>undef(<span class="kw-2">&amp;</span><span class="self">self</span>, ty: Word) -&gt; SpirvValue {
+        <span class="self">self</span>.builder.def_constant(ty, SpirvConst::Undef)
+    }
+}
+
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;tcx</span>&gt; ConstMethods&lt;<span class="lifetime">&#39;tcx</span>&gt; <span class="kw">for </span>CodegenCx&lt;<span class="lifetime">&#39;tcx</span>&gt; {
+    <span class="kw">fn </span>const_null(<span class="kw-2">&amp;</span><span class="self">self</span>, t: <span class="self">Self</span>::Type) -&gt; <span class="self">Self</span>::Value {
+        <span class="self">self</span>.constant_null(t)
+    }
+    <span class="kw">fn </span>const_undef(<span class="kw-2">&amp;</span><span class="self">self</span>, ty: <span class="self">Self</span>::Type) -&gt; <span class="self">Self</span>::Value {
+        <span class="self">self</span>.undef(ty)
+    }
+    <span class="kw">fn </span>const_int(<span class="kw-2">&amp;</span><span class="self">self</span>, t: <span class="self">Self</span>::Type, i: i64) -&gt; <span class="self">Self</span>::Value {
+        <span class="self">self</span>.constant_int(t, i <span class="kw">as </span>u64)
+    }
+    <span class="kw">fn </span>const_uint(<span class="kw-2">&amp;</span><span class="self">self</span>, t: <span class="self">Self</span>::Type, i: u64) -&gt; <span class="self">Self</span>::Value {
+        <span class="self">self</span>.constant_int(t, i)
+    }
+    <span class="kw">fn </span>const_uint_big(<span class="kw-2">&amp;</span><span class="self">self</span>, t: <span class="self">Self</span>::Type, u: u128) -&gt; <span class="self">Self</span>::Value {
+        <span class="self">self</span>.constant_int(t, u <span class="kw">as </span>u64)
+    }
+    <span class="kw">fn </span>const_bool(<span class="kw-2">&amp;</span><span class="self">self</span>, val: bool) -&gt; <span class="self">Self</span>::Value {
+        <span class="self">self</span>.constant_bool(DUMMY_SP, val)
+    }
+    <span class="kw">fn </span>const_i16(<span class="kw-2">&amp;</span><span class="self">self</span>, i: i16) -&gt; <span class="self">Self</span>::Value {
+        <span class="self">self</span>.constant_i16(DUMMY_SP, i)
+    }
+    <span class="kw">fn </span>const_i32(<span class="kw-2">&amp;</span><span class="self">self</span>, i: i32) -&gt; <span class="self">Self</span>::Value {
+        <span class="self">self</span>.constant_i32(DUMMY_SP, i)
+    }
+    <span class="kw">fn </span>const_u32(<span class="kw-2">&amp;</span><span class="self">self</span>, i: u32) -&gt; <span class="self">Self</span>::Value {
+        <span class="self">self</span>.constant_u32(DUMMY_SP, i)
+    }
+    <span class="kw">fn </span>const_u64(<span class="kw-2">&amp;</span><span class="self">self</span>, i: u64) -&gt; <span class="self">Self</span>::Value {
+        <span class="self">self</span>.constant_u64(DUMMY_SP, i)
+    }
+    <span class="kw">fn </span>const_usize(<span class="kw-2">&amp;</span><span class="self">self</span>, i: u64) -&gt; <span class="self">Self</span>::Value {
+        <span class="kw">let </span>ptr_size = <span class="self">self</span>.tcx.data_layout.pointer_size.bits() <span class="kw">as </span>u32;
+        <span class="kw">let </span>t = SpirvType::Integer(ptr_size, <span class="bool-val">false</span>).def(DUMMY_SP, <span class="self">self</span>);
+        <span class="self">self</span>.constant_int(t, i)
+    }
+    <span class="kw">fn </span>const_u8(<span class="kw-2">&amp;</span><span class="self">self</span>, i: u8) -&gt; <span class="self">Self</span>::Value {
+        <span class="self">self</span>.constant_u8(DUMMY_SP, i)
+    }
+    <span class="kw">fn </span>const_real(<span class="kw-2">&amp;</span><span class="self">self</span>, t: <span class="self">Self</span>::Type, val: f64) -&gt; <span class="self">Self</span>::Value {
+        <span class="self">self</span>.constant_float(t, val)
+    }
+
+    <span class="kw">fn </span>const_str(<span class="kw-2">&amp;</span><span class="self">self</span>, s: <span class="kw-2">&amp;</span>str) -&gt; (<span class="self">Self</span>::Value, <span class="self">Self</span>::Value) {
+        <span class="kw">let </span>len = s.len();
+        <span class="kw">let </span>str_ty = <span class="self">self
+            </span>.layout_of(<span class="self">self</span>.tcx.types.str_)
+            .spirv_type(DUMMY_SP, <span class="self">self</span>);
+        <span class="comment">// FIXME(eddyb) include the actual byte data.
+        </span>(
+            <span class="self">self</span>.builder.def_constant(
+                <span class="self">self</span>.type_ptr_to(str_ty),
+                SpirvConst::PtrTo {
+                    pointee: <span class="self">self</span>.undef(str_ty).def_cx(<span class="self">self</span>),
+                },
+            ),
+            <span class="self">self</span>.const_usize(len <span class="kw">as </span>u64),
+        )
+    }
+    <span class="kw">fn </span>const_struct(<span class="kw-2">&amp;</span><span class="self">self</span>, elts: <span class="kw-2">&amp;</span>[<span class="self">Self</span>::Value], _packed: bool) -&gt; <span class="self">Self</span>::Value {
+        <span class="comment">// Presumably this will get bitcasted to the right type?
+        </span><span class="kw">let </span>field_types = elts.iter().map(|f| f.ty).collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
+        <span class="kw">let </span>(field_offsets, size, align) = <span class="kw">crate</span>::abi::auto_struct_layout(<span class="self">self</span>, <span class="kw-2">&amp;</span>field_types);
+        <span class="kw">let </span>struct_ty = SpirvType::Adt {
+            def_id: <span class="prelude-val">None</span>,
+            size,
+            align,
+            field_types,
+            field_offsets,
+            field_names: <span class="prelude-val">None</span>,
+        }
+        .def(DUMMY_SP, <span class="self">self</span>);
+        <span class="self">self</span>.constant_composite(struct_ty, elts.iter().map(|f| f.def_cx(<span class="self">self</span>)))
+    }
+
+    <span class="kw">fn </span>const_to_opt_uint(<span class="kw-2">&amp;</span><span class="self">self</span>, v: <span class="self">Self</span>::Value) -&gt; <span class="prelude-ty">Option</span>&lt;u64&gt; {
+        <span class="self">self</span>.builder.lookup_const_u64(v)
+    }
+    <span class="kw">fn </span>const_to_opt_u128(<span class="kw-2">&amp;</span><span class="self">self</span>, v: <span class="self">Self</span>::Value, sign_ext: bool) -&gt; <span class="prelude-ty">Option</span>&lt;u128&gt; {
+        <span class="self">self</span>.builder.lookup_const_u64(v).map(|v| {
+            <span class="kw">if </span>sign_ext {
+                v <span class="kw">as </span>i64 <span class="kw">as </span>i128 <span class="kw">as </span>u128
+            } <span class="kw">else </span>{
+                v <span class="kw">as </span>u128
+            }
+        })
+    }
+
+    <span class="kw">fn </span>scalar_to_backend(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        scalar: Scalar,
+        layout: abi::Scalar,
+        ty: <span class="self">Self</span>::Type,
+    ) -&gt; <span class="self">Self</span>::Value {
+        <span class="kw">match </span>scalar {
+            Scalar::Int(int) =&gt; {
+                <span class="macro">assert_eq!</span>(int.size(), layout.primitive().size(<span class="self">self</span>));
+                <span class="kw">let </span>data = int.to_bits(int.size()).unwrap();
+
+                <span class="kw">match </span>layout.primitive() {
+                    Primitive::Int(int_size, int_signedness) =&gt; <span class="kw">match </span><span class="self">self</span>.lookup_type(ty) {
+                        SpirvType::Integer(width, spirv_signedness) =&gt; {
+                            <span class="macro">assert_eq!</span>(width <span class="kw">as </span>u64, int_size.size().bits());
+                            <span class="macro">assert_eq!</span>(spirv_signedness, int_signedness);
+                            <span class="self">self</span>.constant_int(ty, data <span class="kw">as </span>u64)
+                        }
+                        SpirvType::Bool =&gt; <span class="kw">match </span>data {
+                            <span class="number">0 </span>=&gt; <span class="self">self</span>.constant_bool(DUMMY_SP, <span class="bool-val">false</span>),
+                            <span class="number">1 </span>=&gt; <span class="self">self</span>.constant_bool(DUMMY_SP, <span class="bool-val">true</span>),
+                            <span class="kw">_ </span>=&gt; <span class="self">self
+                                </span>.tcx
+                                .sess
+                                .fatal(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;Invalid constant value for bool: {}&quot;</span>, data)),
+                        },
+                        other =&gt; <span class="self">self</span>.tcx.sess.fatal(<span class="kw-2">&amp;</span><span class="macro">format!</span>(
+                            <span class="string">&quot;scalar_to_backend Primitive::Int not supported on type {}&quot;</span>,
+                            other.debug(ty, <span class="self">self</span>)
+                        )),
+                    },
+                    Primitive::F32 =&gt; {
+                        <span class="kw">let </span>res = <span class="self">self</span>.constant_f32(DUMMY_SP, f32::from_bits(data <span class="kw">as </span>u32));
+                        <span class="macro">assert_eq!</span>(res.ty, ty);
+                        res
+                    }
+                    Primitive::F64 =&gt; {
+                        <span class="kw">let </span>res = <span class="self">self</span>.constant_f64(DUMMY_SP, f64::from_bits(data <span class="kw">as </span>u64));
+                        <span class="macro">assert_eq!</span>(res.ty, ty);
+                        res
+                    }
+                    Primitive::Pointer =&gt; {
+                        <span class="kw">if </span>data == <span class="number">0 </span>{
+                            <span class="self">self</span>.constant_null(ty)
+                        } <span class="kw">else </span>{
+                            <span class="kw">let </span>result = <span class="self">self</span>.undef(ty);
+                            <span class="comment">// HACK(eddyb) we don&#39;t know whether this constant originated
+                            // in a system crate, so it&#39;s better to always zombie.
+                            </span><span class="self">self</span>.zombie_even_in_user_code(
+                                result.def_cx(<span class="self">self</span>),
+                                DUMMY_SP,
+                                <span class="string">&quot;pointer has non-null integer address&quot;</span>,
+                            );
+                            result
+                        }
+                    }
+                }
+            }
+            Scalar::Ptr(ptr, <span class="kw">_</span>) =&gt; {
+                <span class="kw">let </span>(alloc_id, offset) = ptr.into_parts();
+                <span class="kw">let </span>(base_addr, _base_addr_space) = <span class="kw">match </span><span class="self">self</span>.tcx.global_alloc(alloc_id) {
+                    GlobalAlloc::Memory(alloc) =&gt; {
+                        <span class="kw">let </span>pointee = <span class="kw">match </span><span class="self">self</span>.lookup_type(ty) {
+                            SpirvType::Pointer { pointee } =&gt; pointee,
+                            other =&gt; <span class="self">self</span>.tcx.sess.fatal(<span class="kw-2">&amp;</span><span class="macro">format!</span>(
+                                <span class="string">&quot;GlobalAlloc::Memory type not implemented: {}&quot;</span>,
+                                other.debug(ty, <span class="self">self</span>)
+                            )),
+                        };
+                        <span class="kw">let </span>init = <span class="self">self</span>.create_const_alloc(alloc, pointee);
+                        <span class="kw">let </span>value = <span class="self">self</span>.static_addr_of(init, alloc.inner().align, <span class="prelude-val">None</span>);
+                        (value, AddressSpace::DATA)
+                    }
+                    GlobalAlloc::Function(fn_instance) =&gt; (
+                        <span class="self">self</span>.get_fn_addr(fn_instance.polymorphize(<span class="self">self</span>.tcx)),
+                        <span class="self">self</span>.data_layout().instruction_address_space,
+                    ),
+                    GlobalAlloc::VTable(vty, trait_ref) =&gt; {
+                        <span class="kw">let </span>alloc = <span class="self">self
+                            </span>.tcx
+                            .global_alloc(<span class="self">self</span>.tcx.vtable_allocation((vty, trait_ref)))
+                            .unwrap_memory();
+                        <span class="kw">let </span>pointee = <span class="kw">match </span><span class="self">self</span>.lookup_type(ty) {
+                            SpirvType::Pointer { pointee } =&gt; pointee,
+                            other =&gt; <span class="self">self</span>.tcx.sess.fatal(<span class="kw-2">&amp;</span><span class="macro">format!</span>(
+                                <span class="string">&quot;GlobalAlloc::VTable type not implemented: {}&quot;</span>,
+                                other.debug(ty, <span class="self">self</span>)
+                            )),
+                        };
+                        <span class="kw">let </span>init = <span class="self">self</span>.create_const_alloc(alloc, pointee);
+                        <span class="kw">let </span>value = <span class="self">self</span>.static_addr_of(init, alloc.inner().align, <span class="prelude-val">None</span>);
+                        (value, AddressSpace::DATA)
+                    }
+                    GlobalAlloc::Static(def_id) =&gt; {
+                        <span class="macro">assert!</span>(<span class="self">self</span>.tcx.is_static(def_id));
+                        <span class="macro">assert!</span>(!<span class="self">self</span>.tcx.is_thread_local_static(def_id));
+                        (<span class="self">self</span>.get_static(def_id), AddressSpace::DATA)
+                    }
+                };
+                <span class="kw">let </span>value = <span class="kw">if </span>offset.bytes() == <span class="number">0 </span>{
+                    base_addr
+                } <span class="kw">else </span>{
+                    <span class="self">self</span>.tcx
+                        .sess
+                        .fatal(<span class="string">&quot;Non-zero scalar_to_backend ptr.offset not supported&quot;</span>)
+                    <span class="comment">// let offset = self.constant_u64(ptr.offset.bytes());
+                    // self.gep(base_addr, once(offset))
+                </span>};
+                <span class="kw">if </span>layout.primitive() != Primitive::Pointer {
+                    <span class="self">self</span>.tcx
+                        .sess
+                        .fatal(<span class="string">&quot;Non-pointer-typed scalar_to_backend Scalar::Ptr not supported&quot;</span>);
+                <span class="comment">// unsafe { llvm::LLVMConstPtrToInt(llval, llty) }
+                </span>} <span class="kw">else </span>{
+                    <span class="macro">assert_ty_eq!</span>(<span class="self">self</span>, value.ty, ty);
+                    value
+                }
+            }
+        }
+    }
+
+    <span class="kw">fn </span>zst_to_backend(<span class="kw-2">&amp;</span><span class="self">self</span>, _llty: <span class="self">Self</span>::Type) -&gt; <span class="self">Self</span>::Value {
+        <span class="macro">unreachable!</span>();
+    }
+
+    <span class="comment">// FIXME(eddyb) this shouldn&#39;t exist, and is only used by vtable creation,
+    // see https://github.com/rust-lang/rust/pull/86475#discussion_r680792727.
+    </span><span class="kw">fn </span>const_data_from_alloc(<span class="kw-2">&amp;</span><span class="self">self</span>, _alloc: ConstAllocation&lt;<span class="lifetime">&#39;tcx</span>&gt;) -&gt; <span class="self">Self</span>::Value {
+        <span class="kw">let </span>undef = <span class="self">self</span>.undef(SpirvType::Void.def(DUMMY_SP, <span class="self">self</span>));
+        <span class="self">self</span>.zombie_no_span(undef.def_cx(<span class="self">self</span>), <span class="string">&quot;const_data_from_alloc&quot;</span>);
+        undef
+    }
+    <span class="kw">fn </span>from_const_alloc(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        layout: TyAndLayout&lt;<span class="lifetime">&#39;tcx</span>&gt;,
+        alloc: ConstAllocation&lt;<span class="lifetime">&#39;tcx</span>&gt;,
+        offset: Size,
+    ) -&gt; PlaceRef&lt;<span class="lifetime">&#39;tcx</span>, <span class="self">Self</span>::Value&gt; {
+        <span class="macro">assert_eq!</span>(offset, Size::ZERO);
+        <span class="kw">let </span>ty = layout.spirv_type(DUMMY_SP, <span class="self">self</span>);
+        <span class="kw">let </span>init = <span class="self">self</span>.create_const_alloc(alloc, ty);
+        <span class="kw">let </span>result = <span class="self">self</span>.static_addr_of(init, alloc.inner().align, <span class="prelude-val">None</span>);
+        PlaceRef::new_sized(result, layout)
+    }
+
+    <span class="kw">fn </span>const_ptrcast(<span class="kw-2">&amp;</span><span class="self">self</span>, val: <span class="self">Self</span>::Value, ty: <span class="self">Self</span>::Type) -&gt; <span class="self">Self</span>::Value {
+        <span class="kw">if </span>val.ty == ty {
+            val
+        } <span class="kw">else </span>{
+            <span class="comment">// constant ptrcast is not supported in spir-v
+            </span><span class="kw">let </span>result = val.def_cx(<span class="self">self</span>).with_type(ty);
+            <span class="self">self</span>.zombie_no_span(result.def_cx(<span class="self">self</span>), <span class="string">&quot;const_ptrcast&quot;</span>);
+            result
+        }
+    }
+}
+
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;tcx</span>&gt; CodegenCx&lt;<span class="lifetime">&#39;tcx</span>&gt; {
+    <span class="comment">// This function comes from `ty::layout`&#39;s `layout_of_uncached`,
+    // where it&#39;s named `scalar_unit`.
+    </span><span class="kw">pub fn </span>primitive_to_scalar(<span class="kw-2">&amp;</span><span class="self">self</span>, value: Primitive) -&gt; abi::Scalar {
+        <span class="kw">let </span>bits = value.size(<span class="self">self</span>.data_layout()).bits();
+        <span class="macro">assert!</span>(bits &lt;= <span class="number">128</span>);
+        abi::Scalar::Initialized {
+            value,
+            valid_range: abi::WrappingRange {
+                start: <span class="number">0</span>,
+                end: (!<span class="number">0 </span>&gt;&gt; (<span class="number">128 </span>- bits)),
+            },
+        }
+    }
+
+    <span class="kw">pub fn </span>create_const_alloc(<span class="kw-2">&amp;</span><span class="self">self</span>, alloc: ConstAllocation&lt;<span class="lifetime">&#39;tcx</span>&gt;, ty: Word) -&gt; SpirvValue {
+        <span class="comment">// println!(
+        //     &quot;Creating const alloc of type {} with {} bytes&quot;,
+        //     self.debug_type(ty),
+        //     alloc.len()
+        // );
+        </span><span class="kw">let </span><span class="kw-2">mut </span>offset = Size::ZERO;
+        <span class="kw">let </span>result = <span class="self">self</span>.create_const_alloc2(alloc, <span class="kw-2">&amp;mut </span>offset, ty);
+        <span class="macro">assert_eq!</span>(
+            offset.bytes_usize(),
+            alloc.inner().len(),
+            <span class="string">&quot;create_const_alloc must consume all bytes of an Allocation&quot;
+        </span>);
+        <span class="comment">// println!(&quot;Done creating alloc of type {}&quot;, self.debug_type(ty));
+        </span>result
+    }
+
+    <span class="kw">fn </span>create_const_alloc2(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        alloc: ConstAllocation&lt;<span class="lifetime">&#39;tcx</span>&gt;,
+        offset: <span class="kw-2">&amp;mut </span>Size,
+        ty: Word,
+    ) -&gt; SpirvValue {
+        <span class="kw">let </span>ty_concrete = <span class="self">self</span>.lookup_type(ty);
+        <span class="kw-2">*</span>offset = offset.align_to(ty_concrete.alignof(<span class="self">self</span>));
+        <span class="comment">// these print statements are really useful for debugging, so leave them easily available
+        // println!(&quot;const at {}: {}&quot;, offset.bytes(), self.debug_type(ty));
+        </span><span class="kw">match </span>ty_concrete {
+            SpirvType::Void =&gt; <span class="self">self
+                </span>.tcx
+                .sess
+                .fatal(<span class="string">&quot;Cannot create const alloc of type void&quot;</span>),
+            SpirvType::Bool
+            | SpirvType::Integer(..)
+            | SpirvType::Float(<span class="kw">_</span>)
+            | SpirvType::Pointer { .. } =&gt; {
+                <span class="kw">let </span>size = ty_concrete.sizeof(<span class="self">self</span>).unwrap();
+                <span class="kw">let </span>primitive = <span class="kw">match </span>ty_concrete {
+                    SpirvType::Bool =&gt; Primitive::Int(Integer::fit_unsigned(<span class="number">0</span>), <span class="bool-val">false</span>),
+                    SpirvType::Integer(int_size, int_signedness) =&gt; {
+                        <span class="kw">let </span>integer = <span class="kw">match </span>int_size {
+                            <span class="number">8 </span>=&gt; Integer::I8,
+                            <span class="number">16 </span>=&gt; Integer::I16,
+                            <span class="number">32 </span>=&gt; Integer::I32,
+                            <span class="number">64 </span>=&gt; Integer::I64,
+                            <span class="number">128 </span>=&gt; Integer::I128,
+                            other =&gt; {
+                                <span class="self">self</span>.tcx
+                                    .sess
+                                    .fatal(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;invalid size for integer: {}&quot;</span>, other));
+                            }
+                        };
+                        Primitive::Int(integer, int_signedness)
+                    }
+                    SpirvType::Float(float_size) =&gt; <span class="kw">match </span>float_size {
+                        <span class="number">32 </span>=&gt; Primitive::F32,
+                        <span class="number">64 </span>=&gt; Primitive::F64,
+                        other =&gt; {
+                            <span class="self">self</span>.tcx
+                                .sess
+                                .fatal(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;invalid size for float: {}&quot;</span>, other));
+                        }
+                    },
+                    SpirvType::Pointer { .. } =&gt; Primitive::Pointer,
+                    unsupported_spirv_type =&gt; <span class="macro">bug!</span>(
+                        <span class="string">&quot;invalid spirv type internal to create_alloc_const2: {:?}&quot;</span>,
+                        unsupported_spirv_type
+                    ),
+                };
+                <span class="comment">// alloc_id is not needed by read_scalar, so we just use 0. If the context
+                // refers to a pointer, read_scalar will find the the actual alloc_id. It
+                // only uses the input alloc_id in the case that the scalar is uninitilized
+                // as part of the error output
+                // tldr, the pointer here is only needed for the offset
+                </span><span class="kw">let </span>value = <span class="kw">match </span>alloc
+                    .inner()
+                    .read_scalar(<span class="self">self</span>, alloc_range(<span class="kw-2">*</span>offset, size), primitive.is_ptr())
+                    .unwrap()
+                {
+                    ScalarMaybeUninit::Scalar(scalar) =&gt; {
+                        <span class="self">self</span>.scalar_to_backend(scalar, <span class="self">self</span>.primitive_to_scalar(primitive), ty)
+                    }
+                    ScalarMaybeUninit::Uninit =&gt; <span class="self">self</span>.undef(ty),
+                };
+                <span class="kw-2">*</span>offset += size;
+                value
+            }
+            SpirvType::Adt {
+                size,
+                field_types,
+                field_offsets,
+                ..
+            } =&gt; {
+                <span class="kw">let </span>base = <span class="kw-2">*</span>offset;
+                <span class="kw">let </span><span class="kw-2">mut </span>values = Vec::with_capacity(field_types.len());
+                <span class="kw">let </span><span class="kw-2">mut </span>occupied_spaces = Vec::with_capacity(field_types.len());
+                <span class="kw">for </span>(<span class="kw-2">&amp;</span>ty, <span class="kw-2">&amp;</span>field_offset) <span class="kw">in </span>field_types.iter().zip(field_offsets.iter()) {
+                    <span class="kw">let </span>total_offset_start = base + field_offset;
+                    <span class="kw">let </span><span class="kw-2">mut </span>total_offset_end = total_offset_start;
+                    values.push(
+                        <span class="self">self</span>.create_const_alloc2(alloc, <span class="kw-2">&amp;mut </span>total_offset_end, ty)
+                            .def_cx(<span class="self">self</span>),
+                    );
+                    occupied_spaces.push(total_offset_start..total_offset_end);
+                }
+                <span class="kw">if let </span><span class="prelude-val">Some</span>(size) = size {
+                    <span class="kw-2">*</span>offset += size;
+                } <span class="kw">else </span>{
+                    <span class="macro">assert_eq!</span>(
+                    offset.bytes_usize(),
+                    alloc.inner().len(),
+                    <span class="string">&quot;create_const_alloc must consume all bytes of an Allocation after an unsized struct&quot;
+                </span>);
+                }
+                <span class="self">self</span>.constant_composite(ty, values.into_iter())
+            }
+            SpirvType::Array { element, count } =&gt; {
+                <span class="kw">let </span>count = <span class="self">self</span>.builder.lookup_const_u64(count).unwrap() <span class="kw">as </span>usize;
+                <span class="kw">let </span>values = (<span class="number">0</span>..count).map(|<span class="kw">_</span>| {
+                    <span class="self">self</span>.create_const_alloc2(alloc, offset, element)
+                        .def_cx(<span class="self">self</span>)
+                });
+                <span class="self">self</span>.constant_composite(ty, values)
+            }
+            SpirvType::Vector { element, count } =&gt; {
+                <span class="kw">let </span>total_size = ty_concrete
+                    .sizeof(<span class="self">self</span>)
+                    .expect(<span class="string">&quot;create_const_alloc: Vectors must be sized&quot;</span>);
+                <span class="kw">let </span>final_offset = <span class="kw-2">*</span>offset + total_size;
+                <span class="kw">let </span>values = (<span class="number">0</span>..count).map(|<span class="kw">_</span>| {
+                    <span class="self">self</span>.create_const_alloc2(alloc, offset, element)
+                        .def_cx(<span class="self">self</span>)
+                });
+                <span class="kw">let </span>result = <span class="self">self</span>.constant_composite(ty, values);
+                <span class="macro">assert!</span>(<span class="kw-2">*</span>offset &lt;= final_offset);
+                <span class="comment">// Vectors sometimes have padding at the end (e.g. vec3), skip over it.
+                </span><span class="kw-2">*</span>offset = final_offset;
+                result
+            }
+            SpirvType::Matrix { element, count } =&gt; {
+                <span class="kw">let </span>total_size = ty_concrete
+                    .sizeof(<span class="self">self</span>)
+                    .expect(<span class="string">&quot;create_const_alloc: Matrices must be sized&quot;</span>);
+                <span class="kw">let </span>final_offset = <span class="kw-2">*</span>offset + total_size;
+                <span class="kw">let </span>values = (<span class="number">0</span>..count).map(|<span class="kw">_</span>| {
+                    <span class="self">self</span>.create_const_alloc2(alloc, offset, element)
+                        .def_cx(<span class="self">self</span>)
+                });
+                <span class="kw">let </span>result = <span class="self">self</span>.constant_composite(ty, values);
+                <span class="macro">assert!</span>(<span class="kw-2">*</span>offset &lt;= final_offset);
+                <span class="comment">// Matrices sometimes have padding at the end (e.g. Mat4x3), skip over it.
+                </span><span class="kw-2">*</span>offset = final_offset;
+                result
+            }
+            SpirvType::RuntimeArray { element } =&gt; {
+                <span class="kw">let </span><span class="kw-2">mut </span>values = Vec::new();
+                <span class="kw">while </span>offset.bytes_usize() != alloc.inner().len() {
+                    values.push(
+                        <span class="self">self</span>.create_const_alloc2(alloc, offset, element)
+                            .def_cx(<span class="self">self</span>),
+                    );
+                }
+                <span class="kw">let </span>result = <span class="self">self</span>.constant_composite(ty, values.into_iter());
+                <span class="comment">// TODO: Figure out how to do this. Compiling the below crashes both clspv *and* llvm-spirv:
+                /*
+                __constant struct A {
+                    float x;
+                    int y[];
+                } a = {1, {2, 3, 4}};
+
+                __kernel void foo(__global int* data, __constant int* c) {
+                __constant struct A* asdf = &amp;a;
+                *data = *c + asdf-&gt;y[*c];
+                }
+                */
+                // HACK(eddyb) we don&#39;t know whether this constant originated
+                // in a system crate, so it&#39;s better to always zombie.
+                </span><span class="self">self</span>.zombie_even_in_user_code(
+                    result.def_cx(<span class="self">self</span>),
+                    DUMMY_SP,
+                    <span class="string">&quot;constant runtime array value&quot;</span>,
+                );
+                result
+            }
+            SpirvType::Function { .. } =&gt; <span class="self">self
+                </span>.tcx
+                .sess
+                .fatal(<span class="string">&quot;TODO: SpirvType::Function not supported yet in create_const_alloc&quot;</span>),
+            SpirvType::Image { .. } =&gt; <span class="self">self</span>.tcx.sess.fatal(<span class="string">&quot;Cannot create a constant image value&quot;</span>),
+            SpirvType::Sampler =&gt; <span class="self">self
+                </span>.tcx
+                .sess
+                .fatal(<span class="string">&quot;Cannot create a constant sampler value&quot;</span>),
+            SpirvType::SampledImage { .. } =&gt; <span class="self">self
+                </span>.tcx
+                .sess
+                .fatal(<span class="string">&quot;Cannot create a constant sampled image value&quot;</span>),
+            SpirvType::InterfaceBlock { .. } =&gt; <span class="self">self
+                </span>.tcx
+                .sess
+                .fatal(<span class="string">&quot;Cannot create a constant interface block value&quot;</span>),
+            SpirvType::AccelerationStructureKhr =&gt; <span class="self">self
+                </span>.tcx
+                .sess
+                .fatal(<span class="string">&quot;Cannot create a constant acceleration structure&quot;</span>),
+            SpirvType::RayQueryKhr =&gt; <span class="self">self</span>.tcx.sess.fatal(<span class="string">&quot;Cannot create a constant ray query&quot;</span>),
+        }
+    }
+}
+</code></pre></div>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="rustc_codegen_spirv" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (c0941dfb5 2022-08-21)" ></div></body></html>
